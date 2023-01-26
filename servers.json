@@ -1,0 +1,25 @@
+[
+    {
+		"folder":"BungeeCordServer",
+		"serverJar":"BungeeCord.jar",
+		"screenName":"minecraftServer_bungee",
+		"ram":null
+	},
+	{
+		"folder":"minecraftServer_lobby",
+		"ram":"2G"
+	},
+	{
+		"folder":"minecraftServer_survival"
+	},
+	{
+		"folder":"minecraftServer_creative"
+	},
+	{
+		"folder":"minecraftServer_1.19.3_creative",
+		"serverJar":"paper-1.19.3.jar",
+		"screenName":"minecraftServer_1.19.3_creative",
+		"javaPath":"java",
+		"run":false
+	}
+]
