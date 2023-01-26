@@ -14,5 +14,12 @@
 	},
 	{
 		"folder":"minecraftServer_creative"
+	},
+	{
+		"folder":"minecraftServer_1.19.3_creative",
+		"serverJar":"paper-1.19.3.jar",
+		"screenName":"minecraftServer_1.19.3_creative",
+		"javaPath":"java",
+		"run":false
 	}
 ]

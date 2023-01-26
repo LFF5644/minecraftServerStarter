@@ -1,9 +1,9 @@
 {
-	"path":"..",
+	"path":"/home/lff/Programmes/MinecraftServer",
 	"template_server":{
 		"run":true,
-		"ram":"2G",
-		"serverJar":"server.jar",
-		"javaPath":"java"
+		"ram":"4G",
+		"serverJar":"paper-1.12.2.jar",
+		"javaPath":"/usr/lib/jvm/java-11-openjdk-amd64/bin/java"
 	}
 }
