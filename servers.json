@@ -1,39 +1,10 @@
 [
 	{
-		"name": "Server System",
-		"folder": "BungeeCordServer",
-		"screenName": "minecraftServer_bungee",
-		"javaPath": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
-		"ram": null,
-		"serverJar": "BungeeCord.jar"
+		"name":"Survival Server",
+		"folder":"minecraftServer_survival"
 	},
 	{
-		"name": "Lobby",
-		"folder": "minecraftServer_lobby",
-		"javaPath": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
-		"serverJar": "paper-1.12.2.jar"
-	},
-	{
-		"name": "Survival 1.12.2",
-		"folder": "minecraftServer_survival",
-		"javaPath": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
-		"serverJar": "paper-1.12.2.jar"
-	},
-	{
-		"name": "Creative 1.12.2",
-		"folder": "minecraftServer_creative",
-		"javaPath": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
-		"serverJar": "paper-1.12.2.jar"
-	},
-	{
-		"name": "Erkunden 1.19.3",
-		"folder": "minecraftServer_1.19.3_creative",
-		"serverJar": "paper-1.19.3.jar"
-	},
-	{
-		"name": "Erkunden Minecraft-Snapshot",
-		"folder": "minecraftServer_vanillaSnapshot",
-		"serverJar": "server.jar",
-		"startType": "user"
+		"name":"Creative Server",
+		"folder":"minecraftServer_creative"
 	}
 ]
