@@ -27,7 +27,6 @@
 	},
 	{
 		"name":"Survival Snapshot",
-		"folder":"minecraftServer_lobby",
-		"serverJar":"paper-1.12.2.jar"
+		"folder":"minecraftServer_lobby"
 	}
 ]
