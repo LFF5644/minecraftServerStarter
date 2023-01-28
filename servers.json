@@ -1,10 +1,33 @@
 [
 	{
-		"name":"Survival Server",
-		"folder":"minecraftServer_survival"
+		"name":"Server System",
+		"folder":"BungeeCordServer",
+		"screenName":"minecraftServer_bungee",
+		"ram":null
 	},
 	{
-		"name":"Creative Server",
-		"folder":"minecraftServer_creative"
+		"name":"Lobby",
+		"folder":"minecraftServer_lobby",
+		"serverJar":"paper-1.12.2.jar"
+	},
+	{
+		"name":"Survival 1.12.2",
+		"folder":"minecraftServer_1.12.2_survival",
+		"serverJar":"paper-1.12.2.jar"
+	},
+	{
+		"name":"Creative 1.12.2",
+		"folder":"minecraftServer_1.12.2_creative",
+		"serverJar":"paper-1.12.2.jar"
+	},
+	{
+		"name":"Survival 1.19.3",
+		"folder":"minecraftServer_1.19.3_survival",
+		"serverJar":"paper-1.19.3.jar"
+	},
+	{
+		"name":"Survival Snapshot",
+		"folder":"minecraftServer_lobby",
+		"serverJar":"paper-1.12.2.jar"
 	}
 ]

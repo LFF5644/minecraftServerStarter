@@ -5,7 +5,7 @@
 		"folder":null,
 		"screenName":null,
 		"javaPath":"java",
-		"ram":"2G",
+		"ram":"4G",
 		"serverJar":"server.jar",
 		"startType":"auto",
 		"info":{
