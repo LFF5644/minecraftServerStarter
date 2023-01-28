@@ -1,0 +1,15 @@
+{
+	"path":"/home/lff/Programmes/MinecraftServer",
+	"template_server":{
+		"name":null,
+		"folder":null,
+		"screenName":null,
+		"javaPath":"java",
+		"ram":"4G",
+		"serverJar":"server.jar",
+		"startType":"auto",
+		"info":{
+			"running":false
+		}
+	}
+}
