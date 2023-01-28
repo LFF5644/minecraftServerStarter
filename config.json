@@ -4,9 +4,9 @@
 		"name":null,
 		"folder":null,
 		"screenName":null,
-		"javaPath":"/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
-		"ram":"4G",
-		"serverJar":"paper-1.12.2.jar",
+		"javaPath":"java",
+		"ram":"2G",
+		"serverJar":"server.jar",
 		"startType":"auto",
 		"info":{
 			"running":false

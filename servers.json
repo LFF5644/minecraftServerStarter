@@ -5,70 +5,35 @@
 		"screenName": "minecraftServer_bungee",
 		"javaPath": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
 		"ram": null,
-		"serverJar": "BungeeCord.jar",
-		"startType": "auto",
-		"info": {
-			"running": false
-		}
+		"serverJar": "BungeeCord.jar"
 	},
 	{
 		"name": "Lobby",
 		"folder": "minecraftServer_lobby",
-		"screenName": null,
 		"javaPath": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
-		"ram": "2G",
-		"serverJar": "paper-1.12.2.jar",
-		"startType": "auto",
-		"info": {
-			"running": false
-		}
+		"serverJar": "paper-1.12.2.jar"
 	},
 	{
 		"name": "Survival 1.12.2",
 		"folder": "minecraftServer_survival",
-		"screenName": null,
 		"javaPath": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
-		"ram": "4G",
-		"serverJar": "paper-1.12.2.jar",
-		"startType": "auto",
-		"info": {
-			"running": false
-		}
+		"serverJar": "paper-1.12.2.jar"
 	},
 	{
 		"name": "Creative 1.12.2",
 		"folder": "minecraftServer_creative",
-		"screenName": null,
 		"javaPath": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
-		"ram": "4G",
-		"serverJar": "paper-1.12.2.jar",
-		"startType": "auto",
-		"info": {
-			"running": false
-		}
+		"serverJar": "paper-1.12.2.jar"
 	},
 	{
 		"name": "Erkunden 1.19.3",
 		"folder": "minecraftServer_1.19.3_creative",
-		"screenName": null,
-		"javaPath": "java",
-		"ram": "4G",
-		"serverJar": "paper-1.19.3.jar",
-		"startType": "auto",
-		"info": {
-			"running": false
-		}
+		"serverJar": "paper-1.19.3.jar"
 	},
 	{
 		"name": "Erkunden Minecraft-Snapshot",
 		"folder": "minecraftServer_vanillaSnapshot",
-		"screenName": null,
-		"javaPath": "java",
-		"ram": "4G",
 		"serverJar": "server.jar",
-		"startType": "auto",
-		"info": {
-			"running": false
-		}
+		"startType": "user"
 	}
 ]
