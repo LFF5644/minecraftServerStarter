@@ -57,15 +57,27 @@ if(processArgs.length){ // wenn parameter übergeben
 		processArgs[0]=="set"&&
 		processArgs.length>4
 	){
-		const serverIndex=getServerIndex(
+		let serverIndex=[getServerIndex(
 			processArgs[2],
 			processArgs[1].substring(2)
-		);
+		)];
+		if(
+			processArgs[1]=="--all"&&
+			processArgs[2]=="servers"
+		){
+			serverIndex=new Array(servers.length).fill(0).map((item,index)=>index);
+		}
 		if(processArgs[3]=="running"){
 			const running=Boolean(Number(processArgs[4]));
-			console.log("set running for "+servers[serverIndex].name+" to "+running)
-			if(!servers[serverIndex].info){servers[serverIndex].info={}}
-			servers[serverIndex].info.running=running;
+			let index=0;
+			for(index of serverIndex){
+				console.log("set running for "+servers[index].name+" to "+running);
+				if(!servers[index].info){
+					servers[index].info={running};
+				}else{
+					servers[index].info.running=running;
+				}
+			}
 		}
 	}
 }
