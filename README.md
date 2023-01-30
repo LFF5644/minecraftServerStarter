@@ -1,10 +1,11 @@
 # Minecraft Server Starter
 
 ## Benötigt:
-- Minecraft Java Server
-- Java (für den server)
 - Linux
-- NodeJS => 8
+- Minecraft Java Server
+- Java -> `sudo apt install openjdk-17-jdk`
+- Screen -> `sudo apt install screen`
+- NodeJS -> `sudo apt install nodejs`
 
 ## Erste Einrichtung
 - einen *cache* ordner erstellen
