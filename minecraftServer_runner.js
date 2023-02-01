@@ -30,7 +30,7 @@ process.chdir(config.path||".");
 
 let server;
 for(server of servers){
-	if(!server.startType=="auto"){continue;}
+	if(server.startType!="auto"){continue;}
 	if(server.info.running){continue;}
 	const filename="server"+String(Math.random()).substring(2,8)+".sh";
 	const file=(`
