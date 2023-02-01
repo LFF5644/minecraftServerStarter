@@ -35,14 +35,14 @@ for(server of servers){
 	const filename="server"+String(Math.random()).substring(2,8)+".sh";
 	const file=(`
 		cd "${path}";
-		./serverStatus.js set --name "${server.name}" running 1;
+		./serverStatus.js set --folder "${server.folder}" running 1;
 
 		cd "${config.path||"."}";
 		cd "${server.folder}";
 		${server.javaPath}${server.ram?" -Xmx"+server.ram:""} -jar "${server.serverJar}";
 		
 		cd "${path}";
-		./serverStatus.js set --name "${server.name}" running 0;
+		./serverStatus.js set --folder "${server.folder}" running 0;
 		rm cache/${filename};
 	`
 		.split("\n").join("")
@@ -58,4 +58,5 @@ for(server of servers){
 	);
 	console.log(server.name+" => is starting...");
 	execSync(cmd);
+	execSync("sleep 3");
 }

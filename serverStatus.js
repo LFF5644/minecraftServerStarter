@@ -17,20 +17,15 @@ path=path.join("/");
 const config_servers=path+"/servers.json";
 const config_file=path+"/config.json";
 
-let servers=JSON.parse(readFileSync(config_servers,"utf-8"));
 const config=JSON.parse(readFileSync(config_file,"utf-8"));
+process.chdir(config.path||".");
+execSync("sleep "+Math.round(Math.random()*10));
+let servers=JSON.parse(readFileSync(config_servers,"utf-8"));
 
 servers=servers.map(server=>({
 	...config.template_server,
 	...server,
 }))
-
-writeFileSync(
-	config_servers,
-	JSON.stringify(servers,null,2).split("  ").join("\t"),
-);
-
-process.chdir(config.path||".");
 
 function getServerIndex(findTag,getBy){
 	let index;
