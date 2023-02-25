@@ -41,6 +41,25 @@ function startServer({
 	execSync("sleep 3");
 	return true;
 }
+function getServerIndex(findTag,getBy){
+	let index;
+
+	switch(getBy){
+		case "name":
+			index=servers.findIndex(server=>server.name===findTag);
+			break;
+		case "folder":
+			index=servers.findIndex(server=>server.folder===findTag);
+			break;
+		case "screenName":
+			index=servers.findIndex(server=>server.screenName===findTag);
+			break;
+	}
+	if(index==-1){
+		console.log("server not found!");
+	}
+	return index;
+}
 
 const [
 	_node,
@@ -88,3 +107,20 @@ if(processArgs.length==0){
 	console.log(`davon sind ${serversRunning} schon gestartet und ${serversStartByUser} können nur vom Benutzer aus gestartet werden!`);
 
 }
+else if(processArgs[0]=="start"){
+	const server=servers[getServerIndex(
+		processArgs[2],
+		processArgs[1].substring(2)
+	)];
+	if(!server){
+		process.exit(1);
+	}
+	const started=startServer({
+		server,
+		startBy:"user",
+	});
+	if(!started){
+		console.log("Server nicht Gestartet!");
+	}
+}
+
