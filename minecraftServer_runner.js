@@ -80,7 +80,7 @@ const config=JSON.parse(readFileSync(config_file,"utf-8"));
 servers=servers.map(server=>({
 	...config.template_server,
 	...server,
-}))
+}));
 
 writeFileSync(
 	config_servers,
