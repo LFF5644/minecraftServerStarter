@@ -251,83 +251,12 @@ minecraftServerProcess.stdout.on("data",buffer=>{
 			if(msg.startsWith("Listening on ")){
 				serverStatus.running=true;
 				serverStatus.step=false;
+				console.log(infoText+"Server is running");
 			}
 			
 		}
 		else if(serverStatus.running){	// if server running
-			if_:
-			if(	// [LFF5644] <-> ServerConnector [survival-1.19.3] has connected
-				msg.startsWith("[")&&
-				msg.includes("] <-> ServerConnector [")&&
-				msg.endsWith("] has connected")
-			){
-				const playerName=msg.substring(1,msg
-					.split("")
-					.findIndex(item=>item=="]")
-				);
-				const serverId=msg.substring(
-					msg
-						.split("")
-						.findIndex((item,index)=>
-							item=="["&&
-							index>msg.search("<->")
-						)+1,
-					msg
-						.split("")
-						.findIndex((item,index)=>
-							item=="]"&&
-							index>msg.search("<->")
-						)
-				);
-				if(!servers.some(item=>item.id=serverId)){
-					console.log(infoText+"unknown server id "+serverId);
-					break if_;
-				}
-				if(Object.keys(players).includes(playerName)){
-					players[playerName].server=serverId;
-					players[playerName].online=true;
-				}else{
-					players[playerName]={
-						// TODO => ...playerTemplate,
-						name:playerName,
-						server:serverId,
-						online:true,
-					};
-				}
-				console.log(infoText+playerName+" Betritt Server "+serverId+" ("+serverStatus.playersOnline+" Spieler Online)");
-				serverStatus.playersOnline+=1;
-				serverStatus.players.push(playerName);
-			}
-			else if((	// [LFF5644] <-> DownstreamBridge <-> [survival-1.19.3] has disconnected
-				msg.startsWith("[")&&
-				msg.includes("] <-> DownstreamBridge <-> [")&&
-				msg.endsWith("] has disconnected")
-			)||(
-				msg.startsWith("[")&&
-				msg.includes("] disconnected with: ")
-			)){
-				const playerName=msg.substring(1,msg
-					.split("")
-					.findIndex(item=>item=="]")
-				);
-				if(Object.keys(players).includes(playerName)){
-					players[playerName].online=false;
-					players[playerName].server=null;
-					serverStatus.playersOnline-=1;
-					if(serverStatus.players.includes(playerName)){
-						serverStatus.players.splice(
-							serverStatus.players
-								.findIndex(item=>
-									item==playerName
-								)
-							,1
-						);
-					}
-					console.log(infoText+playerName+" Verlässt das Server ("+serverStatus.playersOnline+" Spieler Online)");
-				}else{
-					console.log(infoText+"WARNUNG: player "+playerName+" not found!");
-				}
-			}
+			
 		}
 	}
 });
