@@ -1,5 +1,6 @@
 #!/bin/env node
-const {readFileSync}=require("fs");
+const {readFileSync,writeFile}=require("fs");
+const {createServer}=require("http");
 const {spawn}=require("child_process");
 
 const [node,thisFile,...processArgs]=process.argv;
@@ -24,12 +25,16 @@ const serverStatus={
 	players:[],
 	lastSave:Date.now(),
 	pid:null,
+	isSleeping:false,
 };
 
 function getServerIndex(findTag,getBy){
 	let index;
 
 	switch(getBy){
+		case "id":
+			index=servers.findIndex(server=>server.id===findTag);
+			break;
 		case "name":
 			index=servers.findIndex(server=>server.name===findTag);
 			break;
@@ -46,6 +51,11 @@ function getServerIndex(findTag,getBy){
 		console.log("server not found!");
 	}
 	return index;
+}
+function BEEP(){	// let MY pc beep if do not work try "sudo chmod 777 /dev/console"
+	try{
+		writeFile("/dev/console","\007","utf-8",function(){});
+	}catch(e){}
 }
 
 servers=servers.map(item=>({
@@ -256,10 +266,58 @@ minecraftServerProcess.stdout.on("data",buffer=>{
 			
 		}
 		else if(serverStatus.running){	// if server running
-			
+
 		}
 	}
 });
+const httpServer=createServer((request,response)=>{
+	let [path,args]=request.url.split("?");
 
-console.log("Minecraft Server is Running on PID "+minecraftServerProcess.pid);
+	response.writeHead(200,{
+		"Content-Type": "text/plain; charset=utf-8",
+		"Cache-Control": "no-cache, no-store",
+	});
+
+	if(path.startsWith("/get")){
+		if(path=="/get/serverStatus"){
+			response.write(
+				JSON.stringify(
+					serverStatus,null,2
+				)
+				.split("  ")
+				.join("\t")
+			);
+		}
+	}
+	else if(path.startsWith("/set")){
+		if(path=="/set/serverSleeping"){
+			const requireSleep=Number(args);
+			
+			if(requireSleep){
+				if(serverStatus.isSleeping){
+					response.write("Server is already sleeping!");
+				}else{
+					process.kill(serverStatus.pid,"SIGSTOP");
+					response.write("Server is now sleeping ...");
+					serverStatus.isSleeping=true;
+				}
+			}
+			if(!requireSleep){
+				if(serverStatus.isSleeping){
+					process.kill(serverStatus.pid,"SIGCONT");	// is not work for more then 20s
+					response.write("Wake up server ....");
+					serverStatus.isSleeping=false;
+				}else{
+					response.write("Server is already awake!");
+				}
+			}
+		}
+	}
+	response.end();
+
+});
+httpServer.listen(server.httpPort);
+
+console.log("Minecraft-Server is running on PID "+minecraftServerProcess.pid);
+console.log("HTTP-Server is Running on port "+server.httpPort);
 serverStatus.pid=minecraftServerProcess.pid;
