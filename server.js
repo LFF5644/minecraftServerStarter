@@ -209,6 +209,7 @@ minecraftServerProcess.stdout.on("data",buffer=>{
 					serverStatus.playersOnline+=1;
 					if(!serverStatus.players.includes(playerName)) serverStatus.players.push(playerName);
 					console.log(infoText+playerName+" Betritt das Spiel ("+serverStatus.playersOnline+" Spieler Online)");
+					BEEP();
 				}else{
 					console.log("WARNUNG: player "+playerName+" not found!");
 				}
@@ -233,6 +234,8 @@ minecraftServerProcess.stdout.on("data",buffer=>{
 						);
 					}
 					console.log(infoText+playerName+" Verlässt das Spiel ("+serverStatus.playersOnline+" Spieler Online)");
+					BEEP();
+					setTimeout(BEEP,2e2);
 				}else{
 					console.log(infoText+"WARNUNG: player "+playerName+" not found!");
 				}
