@@ -2,14 +2,15 @@
 	"path":"/home/lff/Programmes/MinecraftServer",
 	"template_server":{
 		"name":null,
+		"id": null,
 		"folder":null,
 		"screenName":null,
 		"javaPath":"java",
 		"ram":"4G",
+		"httpPort": 3505,
 		"serverJar":"server.jar",
-		"startType":"auto",
-		"info":{
-			"running":false
-		}
+		"version": null,
+		"serverType": "mcs/paper",
+		"startType":"auto"
 	}
 }
