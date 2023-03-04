@@ -8,12 +8,20 @@ let path=thisFile.split("/");
 path.pop();
 path=path.join("/");
 
+const infoText="\x1b[32mINFO: \x1b[0m";
 const config_servers=path+"/servers.json";
 const config_file=path+"/config.json";
-const infoText="\x1b[32mINFO: \x1b[0m";
-
-let servers=JSON.parse(readFileSync(config_servers,"utf-8"));
 const config=JSON.parse(readFileSync(config_file,"utf-8"));
+const servers=JSON.parse(readFileSync(config_servers,"utf-8"))
+	.map(item=>({
+		...config.template_server,
+		...item,
+	})
+);
+
+process.chdir(path);
+process.chdir(config.path);
+
 const sessionData={};
 const players={};
 const serverStatus={
@@ -26,6 +34,7 @@ const serverStatus={
 	lastSave:Date.now(),
 	pid:null,
 	isSleeping:false,
+	needStart:false,
 };
 
 function getServerIndex(findTag,getBy){
@@ -57,14 +66,13 @@ function BEEP(){	// let MY pc beep if do not work try "sudo chmod 777 /dev/conso
 		writeFile("/dev/console","\007","utf-8",function(){});
 	}catch(e){}
 }
-
-servers=servers.map(item=>({
-	...config.template_server,
-	...item,
-}));
-
-process.chdir(path);
-process.chdir(config.path);
+function save(){
+	let config_=JSON.stringify(serverStatus,null,2).split(2).join("\t");
+	if(sessionData.lastSaveStr!=config_){
+		sessionData.lastSaveStr=config_;
+		writeFile(config_serverStatus,config_,function(){});
+	}
+}
 
 if(processArgs.length<2){
 	console.log("Es Fehlen Infomaitonen!");
@@ -82,6 +90,8 @@ if(!server){
 }
 
 process.chdir(server.folder);
+const config_serverStatus=process.cwd()+"/serverStatus.json";
+
 const minecraftServerProcess=spawn(server.javaPath=="java"?"/usr/bin/java":server.javaPath,[
 	"-Xmx"+(server.ram?server.ram:"256M"),
 	"-jar",
@@ -100,7 +110,11 @@ process.stdin.on("data",buffer=>{
 	}else{
 		msg="say "+msg;
 	}
-	if(server.serverType!="proxy/bungee") minecraftServerProcess.stdin.write(msg+"\n");
+	if(
+		server.serverType!="proxy/bungee"&&
+		!minecraftServerProcess.stdout.closed
+	)
+		minecraftServerProcess.stdin.write(msg+"\n");
 });
 minecraftServerProcess.on("exit",code=>{
 	console.log("");
@@ -113,7 +127,10 @@ minecraftServerProcess.on("exit",code=>{
 	serverStatus.playersOnline=0;
 	serverStatus.players=[];
 	serverStatus.pid=null;
+	serverStatus.isSleeping=false;
+	serverStatus.needStart=false;
 
+	save();
 	setTimeout(console.log,5e3,"Exit in 3s ....");
 	setTimeout(process.exit,7e3,0);
 });
@@ -324,3 +341,6 @@ httpServer.listen(server.httpPort);
 console.log("Minecraft-Server is running on PID "+minecraftServerProcess.pid);
 console.log("HTTP-Server is Running on port "+server.httpPort);
 serverStatus.pid=minecraftServerProcess.pid;
+
+save();
+setInterval(save,5e3);	// save all 5s

@@ -1,50 +1,42 @@
 #!/usr/bin/env node
 const {execSync}=require("child_process");
-const {
-	readFileSync,
-	writeFileSync,
-}=require("fs");
+const {readFileSync}=require("fs");
 
 function startServer({
 	server,
 	startBy="auto",
-	startAlways=false,
 }){
-	if(server.startType!="auto"&&startBy=="auto"){return false;}
-	if(server.info.running&&!startAlways){return false;}
-	const filename="server"+String(Math.random()).substring(2,8)+".sh";
-	const file=(`
-		cd "${path}";
-		./serverStatus.js set --folder "${server.folder}" running 1;
+	if(server.startType=="user"&&startBy=="auto"){return false;}
 
-		cd "${config.path||"."}";
-		cd "${server.folder}";
-		${server.javaPath}${server.ram?" -Xmx"+server.ram:""} -jar "${server.serverJar}";
-		
-		cd "${path}";
-		./serverStatus.js set --folder "${server.folder}" running 0;
-		rm cache/${filename};
-	`
-		.split("\n").join("")
-		.split("\t").join("")
-	);
-	writeFileSync(path+"/cache/"+filename,file,"utf-8");
+	process.chdir(config.path||".");
+	process.chdir(server.folder);
+
+	let serverStatus={needStart:true};
+
+	try{
+		serverStatus=JSON.parse(readFileSync("serverStatus.json","utf-8"));
+	}catch(e){}
+
+	if(!serverStatus.needStart){return false;}
+
 	const cmd=(`
 		screen -dmS ${server.screenName?server.screenName:server.folder} 
-		sh ${path}/cache/${filename}
+		${path}/server.js ${server.id?`--id "${server.id}"`:`--folder "${server.folder}"`}
 	`
 		.split("\n").join("")
 		.split("\t").join("")
 	);
 	console.log(server.name+" => is starting...");
 	execSync(cmd);
-	execSync("sleep 3");
 	return true;
 }
 function getServerIndex(findTag,getBy){
 	let index;
 
 	switch(getBy){
+		case "id":
+			index=servers.findIndex(server=>server.id===findTag);
+			break;
 		case "name":
 			index=servers.findIndex(server=>server.name===findTag);
 			break;
@@ -82,14 +74,6 @@ servers=servers.map(server=>({
 	...server,
 }));
 
-writeFileSync(
-	config_servers,
-	JSON.stringify(servers,null,2).split("  ").join("\t"),
-	"utf-8"
-);
-
-process.chdir(config.path||".");
-
 if(processArgs.length==0){
 	let server;
 	let serversStarted=0;
@@ -100,12 +84,8 @@ if(processArgs.length==0){
 			startAlways:false,
 		}));
 	}
-	const serversRunning=Object.keys(servers.filter(server=>server.info.running)).length;
-	const serversStartByUser=Object.keys(servers.filter(server=>server.startType=="user")).length;
-	
-	console.log(`\n${serversStarted}/${servers.length} Server wurden gestartet`);
-	console.log(`davon sind ${serversRunning} schon gestartet und ${serversStartByUser} können nur vom Benutzer aus gestartet werden!`);
 
+	console.log(`\n${serversStarted}/${servers.length} Server wurden gestartet`);
 }
 else if(processArgs[0]=="start"){
 	const server=servers[getServerIndex(
@@ -123,4 +103,3 @@ else if(processArgs[0]=="start"){
 		console.log("Server nicht Gestartet!");
 	}
 }
-
