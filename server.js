@@ -101,11 +101,7 @@ process.stdin.on("data",buffer=>{
 	const text=buffer.toString("utf-8");	// buffer => text
 	let msg=text.split("\n").join("");
 
-	if(
-		msg.startsWith("/")||
-		msg.startsWith("$")||
-		msg.startsWith(">")
-	){
+	if(msg.startsWith("/")){
 		msg=msg.substring(1).trim();
 	}else{
 		msg="say "+msg;
@@ -226,7 +222,7 @@ minecraftServerProcess.stdout.on("data",buffer=>{
 					serverStatus.playersOnline+=1;
 					if(!serverStatus.players.includes(playerName)) serverStatus.players.push(playerName);
 					console.log(infoText+playerName+" Betritt das Spiel ("+serverStatus.playersOnline+" Spieler Online)");
-					BEEP();
+					setTimeout(BEEP,1e3);	// let pc beep in 1s
 				}else{
 					console.log("WARNUNG: player "+playerName+" not found!");
 				}
@@ -336,11 +332,11 @@ const httpServer=createServer((request,response)=>{
 	response.end();
 
 });
-httpServer.listen(server.httpPort);
 
-console.log("Minecraft-Server is running on PID "+minecraftServerProcess.pid);
-console.log("HTTP-Server is Running on port "+server.httpPort);
 serverStatus.pid=minecraftServerProcess.pid;
+if(server.httpPort) httpServer.listen(server.httpPort);
+if(server.httpPort) console.log("HTTP-Server is Running on port "+server.httpPort);
+console.log("Minecraft-Server is running on PID "+minecraftServerProcess.pid);
 
 save();
 setInterval(save,5e3);	// save all 5s
