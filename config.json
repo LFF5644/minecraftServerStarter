@@ -7,9 +7,10 @@
 		"screenName":null,
 		"javaPath":"java",
 		"ram":"4G",
-		"httpPort": 3505,
+		"httpPort": 3501,
+		"sleepingPort": 25565,
 		"serverJar":"server.jar",
-		"version": null,
+		"version": "1.19.4",
 		"serverType": "mcs/paper",
 		"startType":"auto"
 	}

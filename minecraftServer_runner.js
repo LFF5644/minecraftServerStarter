@@ -11,14 +11,6 @@ function startServer({
 	process.chdir(config.path||".");
 	process.chdir(server.folder);
 
-	let serverStatus={needStart:true};
-
-	try{
-		serverStatus=JSON.parse(readFileSync("serverStatus.json","utf-8"));
-	}catch(e){}
-
-	if(!serverStatus.needStart){return false;}
-
 	const cmd=(`
 		screen -dmS ${server.screenName?server.screenName:server.folder} 
 		${path}/server.js ${server.id?`--id "${server.id}"`:`--folder "${server.folder}"`}
@@ -80,8 +72,7 @@ if(processArgs.length==0){
 	for(server of servers){
 		serversStarted+=Number(startServer({
 			server,
-			startBy:"auto",
-			startAlways:false,
+			startBy: "auto",
 		}));
 	}
 
