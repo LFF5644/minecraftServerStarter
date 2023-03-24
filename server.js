@@ -273,7 +273,7 @@ function createSleepingServerProcess(){
 		motd: "§1§l"+server.name+" §r§c- §r§4Schläft",
 		maxPlayers: 20,
 		beforePing: response=>{
-			response.favicon="data:image/png;base64,"+readFileSync("sleeping-favicon.png","base64");
+			response.favicon=getSleepingFavicon();
 		},
 		errorHandler: (client, error)=> console.log(client,error),
 	});
@@ -290,6 +290,22 @@ function sleepingServerProcessOnLogin(client){
 }
 function sleepingServerProcessOnListening(){
 	console.log(infoText+"Server Schläft auf Prot: "+server.sleepingPort);
+}
+function getSleepingFavicon(){
+	//"data:image/png;base64,"+readFileSync("sleeping-favicon.png","base64")
+	let icon;
+	try{
+		icon=readFileSync("sleeping-favicon.png","base64");
+	}catch(e){
+		try{
+			icon=readFileSync(path+"/sleeping-favicon.png","base64");
+		}catch(e){
+			console.log(infoText+"Cant find sleeping favicon");
+			return undefined;
+		}
+	}
+	icon="data:image/png;base64,"+icon;
+	return icon;
 }
 
 if(processArgs.length<2){
