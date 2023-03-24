@@ -109,20 +109,7 @@ function minecraftJavaServerProcessOnExit(code){
 		serverStatus.players=[];
 		serverStatus.pid=null;
 
-		const sleepingServerProcess=mcp.createServer({
-			"online-mode": false,
-			version: server.version,
-			port: server.sleepingPort,
-		});
-		sleepingServerProcess.on("login",client=>{
-			const playerName=client.username;
-			client.end("Server wird gestartet ...");
-			sleepingServerProcess.close();
-			console.log(infoText+playerName+" Startet den Server ...");
-			createMinecraftJavaServerProcess();
-		});
-		sleepingServerProcess.on("listening",()=>console.log(infoText+"Server Schläft auf Prot: "+server.sleepingPort));
-		sleepingServerProcess.on("error",console.log);
+		createSleepingServerProcess();
 	}
 }
 function minecraftJavaServerProcessOnSTDOUT(buffer){
@@ -278,6 +265,32 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 		}
 	}
 }
+function createSleepingServerProcess(){
+	sleepingServerProcess=mcp.createServer({
+		"online-mode": false,
+		version: server.version,
+		port: server.sleepingPort,
+		motd: "§1§l"+server.name+" §r§c- §r§4Schläft",
+		maxPlayers: 20,
+		beforePing: response=>{
+			response.favicon="data:image/png;base64,"+readFileSync("sleeping-favicon.png","base64");
+		},
+		errorHandler: (client, error)=> console.log(client,error),
+	});
+	sleepingServerProcess.on("login",sleepingServerProcessOnLogin);
+	sleepingServerProcess.on("listening",sleepingServerProcessOnListening);
+	sleepingServerProcess.on("error",console.log);
+}
+function sleepingServerProcessOnLogin(client){
+	const playerName=client.username;
+	client.end("Server wird gestartet ...");
+	sleepingServerProcess.close();
+	console.log(infoText+playerName+" Startet den Server ...");
+	createMinecraftJavaServerProcess();
+}
+function sleepingServerProcessOnListening(){
+	console.log(infoText+"Server Schläft auf Prot: "+server.sleepingPort);
+}
 
 if(processArgs.length<2){
 	console.log("Es Fehlen Infomaitonen!");
@@ -298,6 +311,7 @@ process.chdir(server.folder);
 const config_serverStatus=process.cwd()+"/serverStatus.json";
 
 let minecraftJavaServerProcess;
+let sleepingServerProcess;
 createMinecraftJavaServerProcess();
 process.stdin.on("data",buffer=>{
 	const text=buffer.toString("utf-8");	// buffer => text
