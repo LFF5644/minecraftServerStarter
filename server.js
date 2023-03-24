@@ -315,45 +315,7 @@ function getSleepingFavicon(){
 	icon="data:image/png;base64,"+icon;
 	return icon;
 }
-
-if(processArgs.length<2){
-	console.log("Es Fehlen Infomaitonen!");
-	process.exit(1);
-}
-
-const server=servers[getServerIndex(
-	processArgs[1],
-	processArgs[0].substring(2),
-)];
-
-console.log(server);
-if(!server){
-	process.exit(1);
-}
-
-process.chdir(server.folder);
-const config_serverStatus=process.cwd()+"/serverStatus.json";
-
-let minecraftJavaServerProcess;
-let sleepingServerProcess;
-createMinecraftJavaServerProcess();
-process.stdin.on("data",buffer=>{
-	const text=buffer.toString("utf-8");	// buffer => text
-	let msg=text.split("\n").join("");
-
-	if(msg.startsWith("/")){
-		msg=msg.substring(1).trim();
-	}else{
-		msg="say "+msg;
-	}
-	if(
-		server.serverType!="proxy/bungee"&&
-		!minecraftJavaServerProcess.stdout.closed
-	)
-		minecraftJavaServerProcess.stdin.write(msg+"\n");
-});
-
-const httpServer=http.createServer((request,response)=>{
+function onRequest(request,response){
 	let [path,args]=request.url.split("?");
 
 	response.writeHead(200,{
@@ -413,8 +375,47 @@ const httpServer=http.createServer((request,response)=>{
 		}
 	}
 	response.end();
+}
 
+if(processArgs.length<2){
+	console.log("Es Fehlen Infomaitonen!");
+	process.exit(1);
+}
+
+const server=servers[getServerIndex(
+	processArgs[1],
+	processArgs[0].substring(2),
+)];
+
+console.log(server);
+if(!server){
+	process.exit(1);
+}
+
+process.chdir(server.folder);
+const config_serverStatus=process.cwd()+"/serverStatus.json";
+
+let minecraftJavaServerProcess;
+let sleepingServerProcess;
+
+createMinecraftJavaServerProcess();
+process.stdin.on("data",buffer=>{
+	const text=buffer.toString("utf-8");	// buffer => text
+	let msg=text.split("\n").join("");
+
+	if(msg.startsWith("/")){
+		msg=msg.substring(1).trim();
+	}else{
+		msg="say "+msg;
+	}
+	if(
+		server.serverType!="proxy/bungee"&&
+		!minecraftJavaServerProcess.stdout.closed
+	)
+		minecraftJavaServerProcess.stdin.write(msg+"\n");
 });
+
+const httpServer=http.createServer(onRequest);
 
 serverStatus.pid=minecraftJavaServerProcess.pid;
 if(server.httpPort) httpServer.listen(server.httpPort);
