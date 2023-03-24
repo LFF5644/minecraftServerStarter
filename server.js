@@ -22,9 +22,7 @@ const servers=JSON.parse(readFileSync(config_servers,"utf-8"))
 process.chdir(path);
 process.chdir(config.path);
 
-const sessionData={
-	shutdownAction: "exit",
-};
+const sessionData={};
 const players={};
 const serverStatus={
 	running:false,
@@ -34,6 +32,8 @@ const serverStatus={
 	players:[],
 	pid:null,
 };
+const defaultShutdownAction="exit";
+let shutdownAction=null;
 
 function getServerIndex(findTag,getBy){
 	let index;
@@ -64,13 +64,6 @@ function BEEP(){	// let MY pc beep if do not work try "sudo chmod 777 /dev/conso
 		writeFile("/dev/console","\007","utf-8",function(){});
 	}catch(e){}
 }
-function save(){
-	let config_=JSON.stringify(serverStatus,null,2).split("  ").join("\t");
-	if(sessionData.lastSaveStr!=config_){
-		sessionData.lastSaveStr=config_;
-		writeFile(config_serverStatus,config_,function(){});
-	}
-}
 function createMinecraftJavaServerProcess(){
 	minecraftJavaServerProcess=spawn(server.javaPath=="java"?"/usr/bin/java":server.javaPath,[
 		"-Xmx"+(server.ram?server.ram:"256M"),
@@ -84,7 +77,9 @@ function createMinecraftJavaServerProcess(){
 	return minecraftJavaServerProcess;
 }
 function minecraftJavaServerProcessOnExit(code){
-	if(sessionData.shutdownAction==="exit"){
+	const action=shutdownAction?shutdownAction:defaultShutdownAction;
+
+	if(action==="exit"||code!==0){
 		console.log("");
 		console.log(code?"Minecraft-Server CRASHED: "+code:"Minecraft-Server Exited!");
 
@@ -95,12 +90,12 @@ function minecraftJavaServerProcessOnExit(code){
 		serverStatus.players=[];
 		serverStatus.pid=null;
 
-		save();
-		setTimeout(console.log,5e3,"Exit in 3s ....");
+		setTimeout(console.log,5e3,infoText+"Exit in 3s ....");
 		setTimeout(process.exit,7e3,0);
+		shutdownAction=null;
 	}
-	else if(sessionData.shutdownAction==="sleep"&&code===0){
-		console.log(infoText+"Minecraft Server is Sleeping ....");
+	else if(action==="sleep"){
+		console.log(infoText+"Minecraft Server is Sleeping ...");
 
 		serverStatus.running=false;
 		serverStatus.status="Sleeping";
@@ -110,6 +105,20 @@ function minecraftJavaServerProcessOnExit(code){
 		serverStatus.pid=null;
 
 		createSleepingServerProcess();
+		shutdownAction=null;
+	}
+	else if(action==="restart"){
+		console.log(infoText+"Minecraft Server is Restarting ...");
+
+		serverStatus.running=false;
+		serverStatus.status="Startet ...";
+		serverStatus.statusColor="orange";
+		serverStatus.playersOnline=0;
+		serverStatus.players=[];
+		serverStatus.pid=null;
+
+		createMinecraftJavaServerProcess();
+		shutdownAction=null;
 	}
 }
 function minecraftJavaServerProcessOnSTDOUT(buffer){
@@ -152,20 +161,20 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 				serverStatus.statusColor="green";
 				console.log(infoText+"Minecraft Server is running!");
 			}
-			else if(msg=="Closing Server"){
-				serverStatus.status="Offline";
-				serverStatus.statusColor="red";
-				console.log(infoText+"Minecraft Server is offline!");
-			}
 		}
 		else if(serverStatus.running){
 			if(
 				msg=="Stopping the server"||
-				msg=="Stopping server"
+				msg=="Stopping server"||
+				msg==="Closing Server"||
+				msg==="Saving worlds"||
+				msg==="Saving players"||
+				msg.startsWith("Saving chunks for level ")
 			){
+				serverStatus.status="Offline";
+				serverStatus.statusColor="red";
 				serverStatus.running=false;
-				serverStatus.status="Herunterfahren ...";
-				serverStatus.statusColor="orange";
+				console.log(infoText+"Minecraft Server is offline!");
 			}
 			else if(	// UUID of player LFF5644 is xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxx
 				msg.startsWith("UUID of player ")
@@ -292,7 +301,6 @@ function sleepingServerProcessOnListening(){
 	console.log(infoText+"Server Schläft auf Prot: "+server.sleepingPort);
 }
 function getSleepingFavicon(){
-	//"data:image/png;base64,"+readFileSync("sleeping-favicon.png","base64")
 	let icon;
 	try{
 		icon=readFileSync("sleeping-favicon.png","base64");
@@ -371,20 +379,33 @@ const httpServer=http.createServer((request,response)=>{
 			if(requireSleep){
 				if(
 					!serverStatus.running&&
-					sessionData.shutdownAction==="sleep"
+					shutdownAction==="sleep"
 				){
 					response.write("Server is already sleeping!");
 				}else{
-					sessionData.shutdownAction="sleep";
-					minecraftJavaServerProcess.stdin.write("stop\n");
+					shutdownAction="sleep";
+					minecraftJavaServerProcess.stdin.write("stop\nend\n");
 					response.write("Server is now sleeping ...");
 					serverStatus.running=false;
 				}
 			}
 			if(!requireSleep){
 				if(!serverStatus.running){
-					sessionData.shutdownAction="exit";
-					response.write("Wake up server ....");
+					shutdownAction=null;
+					response.write("Wake up Server ...");
+					console.log(infoText+"Wake up Server ...");
+					if(
+						sleepingServerProcess&&
+						!sleepingServerProcess.closed
+					){
+						sleepingServerProcess.close();
+					}
+					if(
+						!minecraftJavaServerProcess||
+						minecraftJavaServerProcess.closed
+					){
+						createMinecraftJavaServerProcess();
+					}
 				}else{
 					response.write("Server is already awake!");
 				}
@@ -398,7 +419,4 @@ const httpServer=http.createServer((request,response)=>{
 serverStatus.pid=minecraftJavaServerProcess.pid;
 if(server.httpPort) httpServer.listen(server.httpPort);
 if(server.httpPort) console.log("HTTP-Server is Running on port "+server.httpPort);
-console.log("Minecraft-Server is running on PID "+minecraftJavaServerProcess.pid);
-
-save();
-setInterval(save,5e3);	// save all 5s
+console.log("Minecraft-Server is running on PID "+serverStatus.pid);
