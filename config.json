@@ -12,6 +12,10 @@
 		"serverJar":"server.jar",
 		"version": "1.19.4",
 		"serverType": "mcs/paper",
-		"startType":"auto"
+		"startType":"auto",
+		"sleep": false,
+		"sleep_time": 10,
+		"sleep_atStart": false,
+		"shutdownAction": "exit"
 	}
 }

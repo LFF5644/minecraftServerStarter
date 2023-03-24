@@ -32,7 +32,6 @@ const serverStatus={
 	players:[],
 	pid:null,
 };
-const defaultShutdownAction="exit";
 let shutdownAction=null;
 
 function getServerIndex(findTag,getBy){
@@ -77,7 +76,7 @@ function createMinecraftJavaServerProcess(){
 	return minecraftJavaServerProcess;
 }
 function minecraftJavaServerProcessOnExit(code){
-	const action=shutdownAction?shutdownAction:defaultShutdownAction;
+	const action=shutdownAction?shutdownAction:server.shutdownAction;
 
 	if(action==="exit"||code!==0){
 		console.log("");
@@ -211,6 +210,11 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 					serverStatus.playersOnline+=1;
 					if(!serverStatus.players.includes(playerName)) serverStatus.players.push(playerName);
 					console.log(infoText+playerName+" Betritt das Spiel ("+serverStatus.playersOnline+" Spieler Online)");
+					onPlayerConnectionChange({
+						playerName,
+						playersOnline: serverStatus.playersOnline,
+						type: "connect",
+					});
 					setTimeout(BEEP,1e3);	// let pc beep in 1s
 				}else{
 					console.log("WARNUNG: player "+playerName+" not found!");
@@ -236,6 +240,11 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 						);
 					}
 					console.log(infoText+playerName+" Verlässt das Spiel ("+serverStatus.playersOnline+" Spieler Online)");
+					onPlayerConnectionChange({
+						playerName,
+						playersOnline: serverStatus.playersOnline,
+						type: "disconnect",
+					});
 					BEEP();
 					setTimeout(BEEP,2e2);
 				}else{
@@ -376,6 +385,31 @@ function onRequest(request,response){
 	}
 	response.end();
 }
+function onPlayerConnectionChange(data){
+	const {playerName,playersOnline,type}=data;
+	if(server.sleep){
+		if(playersOnline===0){
+			console.log(infoText+"Server goes sleeping in "+server.sleep_time+" minute"+(server.sleep_time>1?"s":""));
+			const time=server.sleep_time*1e3*60;
+			sessionData.timeout_sleep=setTimeout(()=>{
+				if(
+					minecraftJavaServerProcess&&
+					!minecraftJavaServerProcess.closed
+				){
+					shutdownAction="sleep";
+					minecraftJavaServerProcess.stdin.write("stop\nend\n");
+					console.log(infoText+"Server is now sleeping ...");
+					serverStatus.running=false;
+				}else{
+					console.log(infoText+"Server is already sleeping!");
+				}
+			},time);
+		}
+		else if(playersOnline!==0){
+			clearTimeout(sessionData.timeout_sleep);
+		}
+	}
+}
 
 if(processArgs.length<2){
 	console.log("Es Fehlen Infomaitonen!");
@@ -398,7 +432,16 @@ const config_serverStatus=process.cwd()+"/serverStatus.json";
 let minecraftJavaServerProcess;
 let sleepingServerProcess;
 
-createMinecraftJavaServerProcess();
+if(server.sleep_atStart){
+	createSleepingServerProcess();
+	console.log(infoText+"Minecraft-Server is sleeping ...");
+}
+else if(!server.sleep_atStart){
+	createMinecraftJavaServerProcess();
+	serverStatus.pid=minecraftJavaServerProcess.pid;
+	console.log(infoText+"Minecraft-Server is running on PID "+serverStatus.pid);
+}
+
 process.stdin.on("data",buffer=>{
 	const text=buffer.toString("utf-8");	// buffer => text
 	let msg=text.split("\n").join("");
@@ -417,7 +460,6 @@ process.stdin.on("data",buffer=>{
 
 const httpServer=http.createServer(onRequest);
 
-serverStatus.pid=minecraftJavaServerProcess.pid;
-if(server.httpPort) httpServer.listen(server.httpPort);
-if(server.httpPort) console.log("HTTP-Server is Running on port "+server.httpPort);
-console.log("Minecraft-Server is running on PID "+serverStatus.pid);
+if(server.httpPort) httpServer.listen(server.httpPort,()=>{
+	console.log(infoText+"HTTP-Server is Running on port "+server.httpPort);
+});
