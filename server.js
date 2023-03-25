@@ -217,7 +217,8 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 					});
 					setTimeout(BEEP,1e3);	// let pc beep in 1s
 				}else{
-					console.log("WARNUNG: player "+playerName+" not found!");
+					console.log(infoText+"WARNUNG: player "+playerName+" not found!");
+					kickPlayer(playerName,"Too Early! Try again!");
 				}
 			}
 			else if(// LFF5644 lost connection: Disconnected
@@ -415,6 +416,9 @@ function setSleeping(requireSleep){
 		}
 	}
 	return true;
+}
+function kickPlayer(playerName,text){
+	minecraftJavaServerProcess.stdin.write(`kick ${playerName} ${text}\n`);
 }
 
 if(processArgs.length<2){
