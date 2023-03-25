@@ -293,11 +293,11 @@ function createSleepingServerProcess(){
 		beforePing: response=>{
 			response.favicon=getSleepingFavicon();
 		},
-		errorHandler: (client, error)=> console.log(client,error),
+		errorHandler: (client,error)=>sleepingServerProcessOnError(error),
 	});
 	sleepingServerProcess.on("login",sleepingServerProcessOnLogin);
 	sleepingServerProcess.on("listening",sleepingServerProcessOnListening);
-	sleepingServerProcess.on("error",console.log);
+	sleepingServerProcess.on("error",sleepingServerProcessOnError);
 }
 function sleepingServerProcessOnLogin(client){
 	const playerName=client.username;
@@ -308,6 +308,15 @@ function sleepingServerProcessOnLogin(client){
 }
 function sleepingServerProcessOnListening(){
 	console.log(infoText+"Server Schläft auf Prot: "+server.sleepingPort);
+}
+function sleepingServerProcessOnError(error){
+	console.log(infoText+"Fehler mit dem minecraft protocol kann sleeping server nicht staten!");
+	if(error.code=="EADDRINUSE"){
+		console.log(infoText+"Port wird derzeit von einem anderem Programm benutzt!");
+		process.exit(0);
+	}else{
+		console.log(error);
+	}
 }
 function getSleepingFavicon(){
 	let icon;
@@ -331,8 +340,11 @@ function onRequest(request,response){
 		"Content-Type": "text/plain; charset=utf-8",
 		"Cache-Control": "no-cache, no-store",
 	});
-
-	if(path.startsWith("/get")){
+	if(path==="/"){
+		response.writeHead(200,{"Content-Type": "text/html; charset=utf-8"});
+		response.write("<h1>Visit <a href=https://github.com/LFF5644/minecraftServerStarter#readme>GitHub.com / LFF5644 / Minecraft Server Stater</a></h1>")
+	}
+	else if(path.startsWith("/get")){
 		if(path=="/get/serverStatus"){
 			response.write(
 				JSON.stringify(
@@ -346,41 +358,8 @@ function onRequest(request,response){
 	else if(path.startsWith("/set")){
 		if(path=="/set/serverSleeping"){
 			const requireSleep=Boolean(Number(args));
-			
-			if(requireSleep){
-				if(
-					!serverStatus.running&&
-					shutdownAction==="sleep"
-				){
-					response.write("Server is already sleeping!");
-				}else{
-					shutdownAction="sleep";
-					minecraftJavaServerProcess.stdin.write("stop\nend\n");
-					response.write("Server is now sleeping ...");
-					serverStatus.running=false;
-				}
-			}
-			if(!requireSleep){
-				if(!serverStatus.running){
-					shutdownAction=null;
-					response.write("Wake up Server ...");
-					console.log(infoText+"Wake up Server ...");
-					if(
-						sleepingServerProcess&&
-						!sleepingServerProcess.closed
-					){
-						sleepingServerProcess.close();
-					}
-					if(
-						!minecraftJavaServerProcess||
-						minecraftJavaServerProcess.closed
-					){
-						createMinecraftJavaServerProcess();
-					}
-				}else{
-					response.write("Server is already awake!");
-				}
-			}
+			const success=setSleeping(requireSleep);
+			response.write(`Server is ${success?"now":"already"} ${requireSleep?"sleeping":"awake"}`);
 		}
 	}
 	response.end();
@@ -391,24 +370,51 @@ function onPlayerConnectionChange(data){
 		if(playersOnline===0){
 			console.log(infoText+"Server goes sleeping in "+server.sleep_time+" minute"+(server.sleep_time>1?"s":""));
 			const time=server.sleep_time*1e3*60;
-			sessionData.timeout_sleep=setTimeout(()=>{
-				if(
-					minecraftJavaServerProcess&&
-					!minecraftJavaServerProcess.closed
-				){
-					shutdownAction="sleep";
-					minecraftJavaServerProcess.stdin.write("stop\nend\n");
-					console.log(infoText+"Server is now sleeping ...");
-					serverStatus.running=false;
-				}else{
-					console.log(infoText+"Server is already sleeping!");
-				}
-			},time);
+			sessionData.timeout_sleep=setTimeout(setSleeping,time,true);
 		}
 		else if(playersOnline!==0){
 			clearTimeout(sessionData.timeout_sleep);
 		}
 	}
+}
+function setSleeping(requireSleep){
+	if(requireSleep){
+		if(!serverStatus.running){
+			return false;
+		}else{
+			// set server to sleeping ...
+			console.log(infoText+"Set Sever to Sleeping ...");
+			if(
+				minecraftJavaServerProcess&&
+				!minecraftJavaServerProcess.closed
+			){
+				shutdownAction="sleep";
+				minecraftJavaServerProcess.stdin.write("kick @a Server wechselt zu Standby\nstop\nend\n");
+				serverStatus.running=false;
+			}
+		}
+	}
+	if(!requireSleep){
+		if(!serverStatus.running){
+			// wake up server ...
+			console.log(infoText+"Wake up Server ...");
+			if(
+				sleepingServerProcess&&
+				!sleepingServerProcess.closed
+			){
+				sleepingServerProcess.close();
+			}
+			if(
+				!minecraftJavaServerProcess||
+				minecraftJavaServerProcess.closed
+			){
+				createMinecraftJavaServerProcess();
+			}
+		}else{
+			return false;
+		}
+	}
+	return true;
 }
 
 if(processArgs.length<2){
@@ -435,6 +441,13 @@ let sleepingServerProcess;
 if(server.sleep_atStart){
 	createSleepingServerProcess();
 	console.log(infoText+"Minecraft-Server is sleeping ...");
+
+	serverStatus.running=false;
+	serverStatus.status="Sleeping";
+	serverStatus.statusColor=null;
+	serverStatus.playersOnline=0;
+	serverStatus.players=[];
+	serverStatus.pid=null;
 }
 else if(!server.sleep_atStart){
 	createMinecraftJavaServerProcess();
