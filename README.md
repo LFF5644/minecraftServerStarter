@@ -21,7 +21,7 @@
 ich besitze einen server in ~/MinecraftServer/testServer
 
 - dann gebe in *config.json* den path an `~/MinecraftServer/testServer`
-- schreibe dann in *server.json* `[ {name:"Test Server", folder:"testServer", screenName:"minecraftServer_test"} ]` wenn der parameter *startType* auf *user* gestellt ist startet der server nicht automatisch!
+- schreibe dann in *server.json* `[ {name:"Test Server", folder:"testServer", id:"test"} ]` wenn der parameter *startType* auf *user* gestellt ist startet der server nicht automatisch!
 - der rest wird in die config ergenst beim ausführen!
 
 ## Wie ausführen?
