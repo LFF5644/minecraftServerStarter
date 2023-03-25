@@ -5,7 +5,7 @@
 - Minecraft Java Server
 - Java -> `sudo apt install openjdk-17-jdk`
 - Screen -> `sudo apt install screen`
-- NodeJS -> `sudo apt install nodejs`
+- NodeJS >= 14 -> `sudo apt install nodejs`
 
 ## Erste Einrichtung
 - einen *cache* ordner erstellen
