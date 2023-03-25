@@ -5,7 +5,7 @@
 - Minecraft Java Server
 - Java -> `sudo apt install openjdk-17-jdk`
 - Screen -> `sudo apt install screen`
-- NodeJS -> `sudo apt install nodejs`
+- NodeJS >= 14 -> `sudo apt install nodejs`
 
 ## Erste Einrichtung
 - einen *cache* ordner erstellen
@@ -21,7 +21,7 @@
 ich besitze einen server in ~/MinecraftServer/testServer
 
 - dann gebe in *config.json* den path an `~/MinecraftServer/testServer`
-- schreibe dann in *server.json* `[ {name:"Test Server", folder:"testServer", screenName:"minecraftServer_test"} ]` wenn der parameter *startType* auf *user* gestellt ist startet der server nicht automatisch!
+- schreibe dann in *server.json* `[ {name:"Test Server", folder:"testServer", id:"test"} ]` wenn der parameter *startType* auf *user* gestellt ist startet der server nicht automatisch!
 - der rest wird in die config ergenst beim ausführen!
 
 ## Wie ausführen?
