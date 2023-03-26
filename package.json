@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/LFF5644/minecraftServerStarter#readme",
   "dependencies": {
-    "minecraft-protocol": "^1.41.1"
+    "minecraft-protocol": "^1.41.1",
+    "socket.io": "^4.6.1"
   }
 }

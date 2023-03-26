@@ -7,7 +7,7 @@
 		"screenName":null,
 		"javaPath":"java",
 		"ram":"4G",
-		"httpPort": 3501,
+		"socketPort": 3501,
 		"sleepingPort": 25565,
 		"serverJar":"server.jar",
 		"version": "1.19.4",
