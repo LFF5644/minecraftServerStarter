@@ -332,37 +332,6 @@ function getSleepingFavicon(){
 	icon="data:image/png;base64,"+icon;
 	return icon;
 }
-function onHttpRequest(request,response){
-	let [path,args]=request.url.split("?");
-
-	response.writeHead(200,{
-		"Content-Type": "text/plain; charset=utf-8",
-		"Cache-Control": "no-cache, no-store",
-	});
-	if(path==="/"){
-		response.writeHead(200,{"Content-Type": "text/html; charset=utf-8"});
-		response.write("<h1>Visit <a href=https://github.com/LFF5644/minecraftServerStarter#readme>GitHub.com / LFF5644 / Minecraft Server Stater</a></h1>")
-	}
-	else if(path.startsWith("/get")){
-		if(path=="/get/serverStatus"){
-			response.write(
-				JSON.stringify(
-					serverStatus,null,2
-				)
-				.split("  ")
-				.join("\t")
-			);
-		}
-	}
-	else if(path.startsWith("/set")){
-		if(path=="/set/serverSleeping"){
-			const requireSleep=Boolean(Number(args));
-			const success=setSleeping(requireSleep);
-			response.write(`Server is ${success?"now":"already"} ${requireSleep?"sleeping":"awake"}`);
-		}
-	}
-	response.end();
-}
 function onPlayerConnectionChange(data){
 	const {playerName,type}=data;
 	const playersOnline=serverStatus.players.length;
@@ -545,10 +514,3 @@ process.stdin.on("data",buffer=>{
 	)
 		minecraftJavaServerProcess.stdin.write(msg+"\n");
 });
-
-/*
-const httpServer=http.createServer(onHttpRequest);
-if(server.httpPort) httpServer.listen(server.httpPort,()=>{
-	console.log(infoText+"HTTP-Server is Running on port "+server.httpPort);
-});
-*/
