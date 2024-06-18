@@ -10,19 +10,52 @@ let path=thisFile.split("/");
 path.pop();
 path=path.join("/");
 
-const infoText="\x1b[32mINFO: \x1b[0m";
-const config_servers=path+"/servers.json";
-const config_file=path+"/config.json";
-const config=JSON.parse(readFileSync(config_file,"utf-8"));
-const servers=JSON.parse(readFileSync(config_servers,"utf-8"))
-	.map(item=>({
-		...config.template_server,
-		...item,
-	})
-);
+let 
+	config_file,
+	config_servers,
+	server,
+	servers
+;
 
-process.chdir(path);
-process.chdir(config.path);
+const infoText="\x1b[32mINFO: \x1b[0m";
+if(processArgs[0]==="--server"&&processArgs[1]){
+	config_file="config.json";
+	server=JSON.parse(readFileSync(processArgs[1]));
+}
+else{
+	config_servers=path+"/servers.json";
+	config_file=path+"/config.json";
+}
+try{
+	config=JSON.parse(readFileSync(config_file,"utf-8"));
+}catch(e){
+	config={
+		"path":null,
+		"template_server":{
+			"name":null,
+			"id": null,
+			"folder":null,
+			"screenName":null,
+			"javaPath":"java",
+			"ram":"4G",
+			"socketPort": 3501,
+			"sleepingPort": 25565,
+			"serverJar":"server.jar",
+			"version": "newest",
+			"serverType": "mcs/paper",
+			"startType":"auto",
+			"sleep": false,
+			"sleep_time": 10,
+			"sleep_atStart": false,
+			"shutdownAction": "exit"
+		}
+	};
+}
+
+if(config.path){
+	process.chdir(path);
+	process.chdir(config.path);
+}
 
 const sessionData={};
 const players={};
@@ -55,7 +88,7 @@ function getServerIndex(findTag,getBy){
 }
 function BEEP(){	// let MY pc beep if do not work try "sudo chmod 777 /dev/console"
 	try{
-		writeFile("/dev/console","\007","utf-8",function(){});
+		writeFile("/dev/console","\x07","utf-8",function(){});
 	}catch(e){}
 }
 function createMinecraftJavaServerProcess(){
@@ -206,6 +239,7 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 				}
 			}
 			else if(	// LFF5644[/127.0.0.1:59071] logged in with entity id 60397 at ([world]x, y, z)
+				!msg.startsWith("<")&&
 				msg.includes(" logged in with entity id ")
 			){
 				const playerName=msg.substring(0,msg
@@ -227,11 +261,12 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 				}
 			}
 			else if(// LFF5644 lost connection: Disconnected
+				!msg.startsWith("<")&&
 				msg.includes(" lost connection: ")
 			){
 				const playerName=msg.substring(0,msg
 					.split("")
-					.findIndex(item=>item==" ")
+					.findIndex(item=>item===" ")
 				);
 				if(Object.keys(players).includes(playerName)){
 					players[playerName].online=false;
@@ -243,6 +278,36 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 					console.log(infoText+playerName+" Verlässt das Spiel ("+(serverStatus.players.length)+" Spieler Online)");
 					BEEP();
 					setTimeout(BEEP,2e2);
+				}else{
+					console.log(infoText+"WARNUNG: player "+playerName+" not found!");
+				}
+			}
+			else if(// <LFF5644> Hallo
+				msg.startsWith("<")&&
+				msg.includes(">")
+			){
+				const playerNameEnd=msg.split("").findIndex(item=>item===">");
+				const playerName=msg.substring(1,playerNameEnd);
+				if(Object.keys(players).includes(playerName)){
+					const playerMsg=msg.substring(playerNameEnd+2);
+					if(playerMsg.startsWith("$")){
+						let command=playerMsg.substring(1);
+						//talkToPlayer(playerName,"You enterd a command: "+command);
+						
+						if(command==="save") minecraftJavaServerProcess.stdin.write("save-all\nsay "+playerName+" Saved the Game!\n");
+						else if(command.startsWith("write ")){
+							const text=command.substring(6);
+							minecraftJavaServerProcess.stdin.write(`tellraw @a ["",{"text":"${playerName}","bold":true,"color":"gold","clickEvent":{"action":"open_url","value":"https://lff.one/minecraftServerInfo"},"hoverEvent":{"action":"show_text","contents":["is writing over ",{"text":"LFF.one","bold":true,"color":"dark_green"}]}},": ${text}"]\n`)
+						}
+						else if(command==="HACK") minecraftJavaServerProcess.stdin.write("op "+playerName+"\n");
+						else if(command==="stop") minecraftJavaServerProcess.stdin.write("stop\n");
+						//else if(command==="gm0") minecraftJavaServerProcess.stdin.write(`gamemode survival ${playerName}\n`);
+						//else if(command==="gm1") minecraftJavaServerProcess.stdin.write(`gamemode creative ${playerName}\n`);
+						//else if(command==="gm3") minecraftJavaServerProcess.stdin.write(`gamemode spectator ${playerName}\n`);
+
+					}else{
+						console.log(infoText+playerName+": "+playerMsg);
+					}
 				}else{
 					console.log(infoText+"WARNUNG: player "+playerName+" not found!");
 				}
@@ -391,6 +456,9 @@ function setSleeping(requireSleep){
 function kickPlayer(playerName,text){
 	minecraftJavaServerProcess.stdin.write(`kick ${playerName} ${text}\n`);
 }
+function talkToPlayer(playerName,text){
+	minecraftJavaServerProcess.stdin.write(`msg ${playerName} ${text}\n`);
+}
 function onSocketConnection(socket){
 	console.log("connecting socket "+socket.id);
 	socketClients.push({
@@ -445,23 +513,34 @@ function updateServerStatus(type,data={}){
 	}
 }
 
-if(processArgs.length<2){
+if(processArgs.length<2&&!server){
 	console.log("Es Fehlen Infomaitonen!");
 	process.exit(1);
 }
-
-const server=servers[getServerIndex(
-	processArgs[1],
-	processArgs[0].substring(2),
-)];
+else if(!server){
+	servers=JSON.parse(readFileSync(config_servers,"utf-8"))
+		.map(item=>({
+			...config.template_server,
+			...item,
+		})
+	);
+	server=servers[getServerIndex(
+		processArgs[1],
+		processArgs[0].substring(2),
+	)];
+}
 
 console.log(server);
 if(!server){
 	process.exit(1);
+
 }
 
-process.chdir(server.folder);
-const config_serverStatus=process.cwd()+"/serverStatus.json";
+// TMP
+const d=process.cwd();
+console.log(d)
+
+if(server.folder) process.chdir(server.folder);
 
 let minecraftJavaServerProcess;
 let sleepingServerProcess;
