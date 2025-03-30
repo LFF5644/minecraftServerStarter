@@ -59,6 +59,8 @@ if(config.path){
 
 const sessionData={};
 const players={};
+const messages=[];
+const logs=[];
 let shutdownAction=null;
 let socketClients=[];
 
@@ -161,7 +163,7 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 	if(msg){
 		console.log("RAW: "+msg);
 	}
-	
+	logPush(msg);
 	if(server.serverType=="mcs/paper"){
 		if(	// "[15:12:27 INFO]: Server Started" => "Server Started"
 			msg.startsWith("[")&&
@@ -246,6 +248,7 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 			}
 			else if(	// LFF5644[/127.0.0.1:59071] logged in with entity id 60397 at ([world]x, y, z)
 				!msg.startsWith("<")&&
+				!msg.startsWith("[Not Secure] <")&&
 				msg.includes(" logged in with entity id ")
 			){
 				const playerName=msg.substring(0,msg
@@ -255,10 +258,6 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 				if(Object.keys(players).includes(playerName)){
 					players[playerName].online=true;
 					updateServerStatus("playerJoin",playerName);
-					onPlayerConnectionChange({
-						playerName,
-						type: "connect",
-					});
 					console.log(infoText+playerName+" Betritt das Spiel ("+serverStatus.players.length+" Spieler Online)");
 					setTimeout(BEEP,1e3);	// let pc beep in 1s
 				}else{
@@ -268,6 +267,7 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 			}
 			else if(// LFF5644 lost connection: Disconnected
 				!msg.startsWith("<")&&
+				!msg.startsWith("[Not Secure] <")&&
 				msg.includes(" lost connection: ")
 			){
 				const playerName=msg.substring(0,msg
@@ -277,11 +277,7 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 				if(Object.keys(players).includes(playerName)){
 					players[playerName].online=false;
 					updateServerStatus("playerLeft",playerName);
-					onPlayerConnectionChange({
-						playerName,
-						type: "disconnect",
-					});
-					console.log(infoText+playerName+" Verlässt das Spiel ("+(serverStatus.players.length)+" Spieler Online)");
+					console.log(infoText+playerName+" Verlässt das Spiel ("+serverStatus.players.length+" Spieler Online)");
 					BEEP();
 					setTimeout(BEEP,2e2);
 				}else{
@@ -289,11 +285,15 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 				}
 			}
 			else if(// <LFF5644> Hallo
-				msg.startsWith("<")&&
+				(
+					msg.startsWith("<")||
+					msg.startsWith("[Not Secure] <")
+				)&&
 				msg.includes(">")
 			){
+				const playerNameStart=msg.split("").findIndex(item=>item==="<")+1;
 				const playerNameEnd=msg.split("").findIndex(item=>item===">");
-				const playerName=msg.substring(1,playerNameEnd);
+				const playerName=msg.substring(playerNameStart,playerNameEnd);
 				if(Object.keys(players).includes(playerName)){
 					const playerMsg=msg.substring(playerNameEnd+2);
 					if(playerMsg.startsWith("$")){
@@ -315,7 +315,7 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 						//if(command==="scoreboard display ") console.log("scoreboard objectives setdisplay "+command.substring(19)+"\nsay showing '"+command.substring(19).split(" ")[0]+"' at '"+command.substring(19).split(" ")[1]+"'\n");
 
 					}else{
-						console.log(infoText+playerName+": "+playerMsg);
+						messagePush(playerName,playerMsg);
 					}
 				}else{
 					console.log(infoText+"WARNUNG: player "+playerName+" not found!");
@@ -355,6 +355,17 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 
 		}
 	}
+}
+function messagePush(playerName,playerMsg){
+	console.log(infoText+playerName+": "+playerMsg);
+	const msg=[Date.now(),playerName,playerMsg];
+	io.emit("message",msg);
+	messages.push(msg);
+}
+function logPush(msg){
+	const ob=[Date.now(),msg];
+	io.emit("log",ob);
+	logs.push(ob);
 }
 function createSleepingServerProcess(){
 	sleepingServerProcess=mcp.createServer({
@@ -405,20 +416,6 @@ function getSleepingFavicon(){
 	}
 	icon="data:image/png;base64,"+icon;
 	return icon;
-}
-function onPlayerConnectionChange(data){
-	const {playerName,type}=data;
-	const playersOnline=serverStatus.players.length;
-	if(server.sleep){
-		if(playersOnline===0){
-			console.log(infoText+"Server goes sleeping in "+server.sleep_time+" minute"+(server.sleep_time>1?"s":""));
-			const time=server.sleep_time*1e3*60;
-			sessionData.timeout_sleep=setTimeout(setSleeping,time,true);
-		}
-		else if(playersOnline!==0){
-			clearTimeout(sessionData.timeout_sleep);
-		}
-	}
 }
 function setSleeping(requireSleep){
 	if(requireSleep){
@@ -475,6 +472,7 @@ function onSocketConnection(socket){
 		socket,
 	});
 	socket.on("serverStatus",()=>socket.emit("serverStatus",serverStatus));
+	socket.on("get-serverObject",()=>socket.emit("serverObject",server));
 	socket.on("kickPlayer",kickPlayer);
 	socket.on("beep",BEEP);
 	socket.on("executeCommand",cmd=>{
@@ -484,7 +482,6 @@ function onSocketConnection(socket){
 		// remove client form clients list
 		socketClients=socketClients.filter(item=>item.id!==socket.id);
 	});
-
 }
 function updateServerStatus(type,data={}){
 	if(type==="key"){
@@ -501,6 +498,8 @@ function updateServerStatus(type,data={}){
 		io.emit("loadStatusTemplate");
 	}
 	else if(type=="playerJoin"){
+		serverStatus.players=serverStatus.players.filter(item=>item!==data);
+		const playersOnline=serverStatus.players.length;
 		serverStatus={
 			...serverStatusTemplate,
 			...serverStatus,
@@ -510,6 +509,7 @@ function updateServerStatus(type,data={}){
 			],
 		};
 		io.emit("playerJoin",data);
+		if(server.sleep) clearTimeout(sessionData.timeout_sleep); // reset server sleeping counter
 	}
 	else if(type=="playerLeft"){
 		serverStatus={
@@ -519,6 +519,13 @@ function updateServerStatus(type,data={}){
 				.filter(item=>item!==data),
 		};
 		io.emit("playerLeft",data);
+
+		const playersOnline=serverStatus.players.length;
+		if(server.sleep&&playersOnline===0){
+			console.log(infoText+"Server goes sleeping in "+server.sleep_time+" minute"+(server.sleep_time>1?"s":""));
+			const time=server.sleep_time*1e3*60;
+			sessionData.timeout_sleep=setTimeout(setSleeping,time,true);
+		}
 	}
 }
 
@@ -547,7 +554,7 @@ if(!server){
 
 // TMP
 const d=process.cwd();
-console.log(d)
+console.log(d);
 
 if(server.folder) process.chdir(server.folder);
 
