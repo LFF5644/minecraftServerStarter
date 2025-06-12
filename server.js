@@ -1,6 +1,7 @@
 #!/usr/bin/env node
+// requires node 18 or higher for the minecraft-protocol!
 //#!/opt/node-v18.15.0-linux-x64/bin/node
-const {readFileSync,writeFile}=require("fs");
+const {readFileSync,writeFile, writeFileSync}=require("fs");
 const http=require("http");
 const {spawn}=require("child_process");
 const mcp=require("minecraft-protocol");
@@ -15,7 +16,8 @@ let
 	config_file,
 	config_servers,
 	server,
-	servers
+	servers,
+	shutdown
 ;
 
 const infoText="\x1b[32mINFO: \x1b[0m";
@@ -129,17 +131,26 @@ function createMinecraftJavaServerProcess(){
 	return minecraftJavaServerProcess;
 }
 function minecraftJavaServerProcessOnExit(code){
-	const action=shutdownAction?shutdownAction:server.shutdownAction;
+	const action= code===0
+	?	(shutdownAction?shutdownAction:server.shutdownAction)
+	:	(server.crashAction?server.crashAction:"exit")
 
-	if(action==="exit"||code!==0){
+	if(code!==0) console.log(infoText+"Minecraft-Server CRASHED",code);
+
+	saveHistory();
+
+	if(action==="exit"||shutdown){
 		console.log("");
-		console.log(code?"Minecraft-Server CRASHED: "+code:"Minecraft-Server Exited!");
+		console.log(code?"Minecraft-Server CRASHED: "+code:(infoText+"Minecraft-Server Exited!"));
 
 		updateServerStatus("loadTemplate");
-
-		setTimeout(console.log,5e3,infoText+"Exit in 3s ....");
-		setTimeout(process.exit,7e3,0);
 		shutdownAction=null;
+
+		if(!shutdown){
+			setTimeout(console.log,5e3,infoText+"Exit in 3s ....");
+			setTimeout(SHUTDOWN,7e3);
+		}
+		else process.exit(code);
 	}
 	else if(action==="sleep"){
 		console.log(infoText+"Minecraft Server is Sleeping ...");
@@ -359,6 +370,13 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 					console.log(infoText+"WARNUNG: player "+playerName+" not found!");
 				}
 			}
+			else if(// catches "[Not Secure] [Server] Ich bin der Server!"
+				msg.startsWith("[Server] ")||
+				msg.startsWith("[Not Secure] [Server] ")
+			){
+				const message=msg.substring(msg.indexOf("[Server] ")+9);
+				messagePush("Server",message);
+			}
 		}
 	}
 	else if(server.serverType=="proxy/bungee"){
@@ -426,6 +444,7 @@ function sleepingServerProcessOnLogin(client){
 	const playerName=client.username;
 	client.end("Server wird gestartet ...");
 	sleepingServerProcess.close();
+	sleepingServerProcess=null;
 	console.log(infoText+playerName+" Startet den Server ...");
 	createMinecraftJavaServerProcess();
 }
@@ -572,6 +591,29 @@ function updateServerStatus(type,data={}){
 		}
 	}
 }
+function saveHistory(){
+	// TODO better formart.
+	console.log("Speiche 'history.json'");
+	writeFileSync("history.json",JSON.stringify(histories,null,"\t"));
+}
+function SHUTDOWN(){
+	if(shutdown) return;
+	shutdown=true;
+
+	console.log(infoText+"Beende...");
+	saveHistory();
+
+	if(sleepingServerProcess){
+		sleepingServerProcess.close();
+		sleepingServerProcess=null;
+	}
+
+	if(serverStatus.pid){
+		//minecraftJavaServerProcess.exit("SIGINT")
+		minecraftJavaServerProcess.stdin.write(server.serverType==="proxy/bungee"?"end\n":"stop\n");
+	}
+	else process.exit(0);
+}
 
 if(processArgs.length<2&&!server){
 	console.log("Es Fehlen Infomaitonen!");
@@ -616,6 +658,10 @@ const serverStatusTemplate={
 };
 let serverStatus=serverStatusTemplate;
 
+try{
+	histories=JSON.parse(readFileSync("history.json","utf-8"));
+}catch(e){console.log("cant open history.json")}
+
 const io=socketIo(server.socketPort,{
 	cors:{
 		origin:"*",
@@ -654,3 +700,5 @@ process.stdin.on("data",buffer=>{
 	)
 		minecraftJavaServerProcess.stdin.write(msg+"\n");
 });
+
+process.on("SIGINT",SHUTDOWN);
