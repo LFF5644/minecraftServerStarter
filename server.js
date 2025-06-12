@@ -1,4 +1,5 @@
-#!/opt/node-v18.15.0-linux-x64/bin/node
+#!/usr/bin/env node
+//#!/opt/node-v18.15.0-linux-x64/bin/node
 const {readFileSync,writeFile}=require("fs");
 const http=require("http");
 const {spawn}=require("child_process");
@@ -47,8 +48,11 @@ try{
 			"sleep": false,
 			"sleep_time": 10,
 			"sleep_atStart": false,
-			"shutdownAction": "exit"
-		}
+			"shutdownAction": "exit",
+			"nogui": false,
+			"custom_args": null,
+			"custom_jvm_args": null,
+		},
 	};
 }
 
@@ -59,8 +63,7 @@ if(config.path){
 
 const sessionData={};
 const players={};
-const messages=[];
-const logs=[];
+const histories=[];
 let shutdownAction=null;
 let socketClients=[];
 
@@ -88,16 +91,32 @@ function getServerIndex(findTag,getBy){
 	}
 	return index;
 }
-function BEEP(){	// let MY pc beep if do not work try "sudo chmod 777 /dev/console"
-	try{
-		writeFile("/dev/console","\x07","utf-8",function(){});
-	}catch(e){}
+function BEEP(){	// let MY pc beep if do not work try "sudo chmod 777 /dev/console" or "sudo usermod -aG tty $USER"
+	writeFile("/dev/console","\x07","utf-8",function(){});
 }
 function createMinecraftJavaServerProcess(){
+	let args_jvm=[];
+	let args=[];
+	if(server.custom_jvm_args){
+		args_jvm=server.custom_jvm_args;
+	}
+	else{
+		args_jvm=[
+			"-Xmx"+(server.ram?server.ram:"256M"),
+			"-jar",
+			server.serverJar,
+		];
+	}
+	if(server.custom_args){
+		args=server.custom_args;
+	}
+	else{
+		if(server.nogui) args.push("nogui");
+	}
+
 	minecraftJavaServerProcess=spawn(server.javaPath=="java"?"/usr/bin/java":server.javaPath,[
-		"-Xmx"+(server.ram?server.ram:"256M"),
-		"-jar",
-		server.serverJar,
+		...args_jvm,
+		...args,
 	]);
 	updateServerStatus("key",{
 		key: "pid",
@@ -153,6 +172,7 @@ function minecraftJavaServerProcessOnExit(code){
 }
 function minecraftJavaServerProcessOnSTDOUT(buffer){
 	const text=buffer.toString("utf-8");	// buffer => text
+	const now=Date.now();
 	let msg=(text
 		.split("\n").join("")
 		.split("\r").join("")
@@ -164,8 +184,12 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 		console.log("RAW: "+msg);
 	}
 	logPush(msg);
-	if(server.serverType=="mcs/paper"){
-		if(	// "[15:12:27 INFO]: Server Started" => "Server Started"
+	if(
+		server.serverType==="mcs/paper"||
+		server.serverType==="mcs/forge"
+	){
+		if(	// "[15:12:27 INFO]: Server Started" <= paper server
+			server.serverType==="mcs/paper"&&
 			msg.startsWith("[")&&
 			msg.includes(":")&&
 			msg.substring(3,7).startsWith(":")&&
@@ -177,6 +201,20 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 			msg.substring(14,17)=="]: "
 		){
 			msg=msg.substring(17);
+			// only "Server Started"
+		}
+		else if( // "[22:15:19] [Server thread/INFO] [minecraft/MinecraftServer]: LFF5644 joined the game" <= forge server
+			server.serverType==="mcs/forge"&&
+			msg.startsWith("[")&&
+			msg.includes(":")&&
+			msg.substring(3,7).startsWith(":")&&
+			msg.substring(3,7).endsWith(":")&&
+			msg.substring(9,11)=="] "
+		){
+			msg=msg.substring(11);
+			const sectionOffset=msg.indexOf(":");
+			msg=msg.substring(sectionOffset+2);
+			// removes the rest just need => "LFF5644 left the game"
 		}
 		if(!serverStatus.running){
 			if(msg.startsWith("Preparing spawn area: ")){
@@ -213,8 +251,8 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 		}
 		else if(serverStatus.running){
 			if(
-				msg=="Stopping the server"||
-				msg=="Stopping server"||
+				msg==="Stopping the server"||
+				msg==="Stopping server"||
 				msg==="Closing Server"||
 				msg==="Saving worlds"||
 				msg==="Saving players"||
@@ -241,8 +279,8 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 				}else{
 					players[playerName]={
 						// TODO => ...playerTemplate,
-						name:playerName,
-						online:true,
+						name: playerName,
+						online: true,
 					};
 				}
 			}
@@ -355,17 +393,18 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 
 		}
 	}
+	else throw new Error("Minecraft-Server Type not supported!");
 }
-function messagePush(playerName,playerMsg){
+function messagePush(playerName,playerMsg,source="minecraft"){
 	console.log(infoText+playerName+": "+playerMsg);
-	const msg=[Date.now(),playerName,playerMsg];
-	io.emit("message",msg);
-	messages.push(msg);
+	const msg=[Date.now(),"message",playerName,playerMsg,source];
+	io.emit("history",msg);
+	histories.push(msg);
 }
-function logPush(msg){
-	const ob=[Date.now(),msg];
-	io.emit("log",ob);
-	logs.push(ob);
+function logPush(log){
+	const msg=[Date.now(),"log",log];
+	io.emit("history",msg);
+	histories.push(msg);
 }
 function createSleepingServerProcess(){
 	sleepingServerProcess=mcp.createServer({
@@ -397,7 +436,7 @@ function sleepingServerProcessOnError(error){
 	console.log(infoText+"Fehler mit dem minecraft protocol kann sleeping server nicht staten!");
 	if(error.code=="EADDRINUSE"){
 		console.log(infoText+"Port wird derzeit von einem anderem Programm benutzt!");
-		process.exit(0);
+		process.exit(1);
 	}else{
 		console.log(error);
 	}
@@ -478,6 +517,11 @@ function onSocketConnection(socket){
 	socket.on("executeCommand",cmd=>{
 		minecraftJavaServerProcess.stdin.write(cmd+"\n");
 	});
+	socket.on("writeMessage",(nickname,message,source="web",cb=()=>{})=>{
+		minecraftJavaServerProcess.stdin.write(`tellraw @a ["",{"text":"${nickname}","bold":true,"color":"gold","clickEvent":{"action":"open_url","value":"https://lff.one/minecraftServerInfo"},"hoverEvent":{"action":"show_text","contents":["is writing over ",{"text":"LFF.one","bold":true,"color":"dark_green"}]}},": ${message}"]\n`);
+		messagePush(nickname,message,source);
+		cb(true);
+	})
 	socket.on("disconnect",()=>{
 		// remove client form clients list
 		socketClients=socketClients.filter(item=>item.id!==socket.id);
