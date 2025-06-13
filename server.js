@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // requires node 18 or higher for the minecraft-protocol!
 //#!/opt/node-v18.15.0-linux-x64/bin/node
-const {readFileSync,writeFile, writeFileSync}=require("fs");
+const {readFileSync,writeFile,writeFileSync}=require("fs");
 const http=require("http");
 const {spawn}=require("child_process");
 const mcp=require("minecraft-protocol");
@@ -65,7 +65,7 @@ if(config.path){
 
 const sessionData={};
 const players={};
-const histories=[];
+let histories=[];
 let shutdownAction=null;
 let socketClients=[];
 
@@ -126,7 +126,25 @@ function createMinecraftJavaServerProcess(){
 	});
 
 	minecraftJavaServerProcess.on("exit",minecraftJavaServerProcessOnExit);
-	minecraftJavaServerProcess.stdout.on("data",minecraftJavaServerProcessOnSTDOUT);
+	
+	let current_stdout="";
+
+	minecraftJavaServerProcess.stdout.on("data",buffer=>{
+		let text=current_stdout+buffer.toString("utf-8").split("\r").join("");
+		while(text.includes("\n")){
+			const chunkLength=text.indexOf("\n");
+			const chunk=text.substring(0,chunkLength);
+			text=text.substring(chunkLength+1);
+
+			if(chunk.endsWith(">")){
+				chunk=chunk.substring(0,chunkLength-1);
+			}
+
+			if(chunk.length<1) continue;
+			else minecraftJavaServerProcessOnSTDOUT(chunk);
+		}
+		current_stdout=text;
+	});
 
 	return minecraftJavaServerProcess;
 }
@@ -181,10 +199,10 @@ function minecraftJavaServerProcessOnExit(code){
 		shutdownAction=null;
 	}
 }
-function minecraftJavaServerProcessOnSTDOUT(buffer){
-	const text=buffer.toString("utf-8");	// buffer => text
+function minecraftJavaServerProcessOnSTDOUT(msg){
+	//const text=buffer.toString("utf-8");	// buffer => text
 	const now=Date.now();
-	let msg=(text
+	/*let msg=(text
 		.split("\n").join("")
 		.split("\r").join("")
 	);
@@ -193,7 +211,8 @@ function minecraftJavaServerProcessOnSTDOUT(buffer){
 	}
 	if(msg){
 		console.log("RAW: "+msg);
-	}
+	}*/
+	console.log("RAW: "+msg);
 	logPush(msg);
 	if(
 		server.serverType==="mcs/paper"||
@@ -545,6 +564,9 @@ function onSocketConnection(socket){
 		// remove client form clients list
 		socketClients=socketClients.filter(item=>item.id!==socket.id);
 	});
+	socket.on("histories",()=>{
+		socket.emit("histories",histories);
+	});
 }
 function updateServerStatus(type,data={}){
 	if(type==="key"){
@@ -593,8 +615,8 @@ function updateServerStatus(type,data={}){
 }
 function saveHistory(){
 	// TODO better formart.
-	console.log("Speiche 'history.json'");
 	writeFileSync("history.json",JSON.stringify(histories,null,"\t"));
+	console.log("Speiche 'history.json'");
 }
 function SHUTDOWN(){
 	if(shutdown) return;
@@ -660,7 +682,7 @@ let serverStatus=serverStatusTemplate;
 
 try{
 	histories=JSON.parse(readFileSync("history.json","utf-8"));
-}catch(e){console.log("cant open history.json")}
+}catch(e){console.log("WARN: cant open history.json",e.message)}
 
 const io=socketIo(server.socketPort,{
 	cors:{
