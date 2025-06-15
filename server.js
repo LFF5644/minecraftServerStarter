@@ -77,7 +77,7 @@ const playerTemplate={
 };
 
 const sessionData={};
-const players={};
+let players={};
 let histories=[];
 let shutdownAction=null;
 let socketClients=[];
@@ -168,7 +168,9 @@ function minecraftJavaServerProcessOnExit(code){
 
 	if(code!==0) console.log(infoText+"Minecraft-Server CRASHED",code);
 
+	logoutAllPlayers();
 	saveHistory();
+	savePlayers();
 
 	if(action==="exit"||shutdown){
 		console.log("");
@@ -364,19 +366,7 @@ function minecraftJavaServerProcessOnSTDOUT(msg){
 					.findIndex(item=>item===" ")
 				);
 				if(Object.keys(players).includes(playerName)){
-					//players[playerName].online=false;
-					const player=getPlayer(playerName);
-					updatePlayer({
-						last_connection: now,
-						name: playerName,
-						online_since: 0,
-						online: false,
-						total_playedTime: player.total_playedTime+Math.round((now-player.online_since)/1000/60),
-					});
-					updateServerStatus("playerLeft",playerName);
-					console.log(infoText+playerName+" Verlässt das Spiel ("+serverStatus.players.length+" Spieler Online)");
-					BEEP();
-					setTimeout(BEEP,2e2);
+					disconnectPlayer(playerName)
 				}else{
 					console.log(infoText+"WARNUNG: player "+playerName+" not found!");
 				}
@@ -662,19 +652,50 @@ function updatePlayer(playerModifications){
 		players[playerModifications.name]||{...playerTemplate},
 		playerModifications
 	);
-	console.log(getPlayer(playerModifications.name));
+	//console.log(getPlayer(playerModifications.name));
+}
+function disconnectPlayer(playerName){
+	const now=Date.now();
+	const player=getPlayer(playerName);
+	if(!player) return console.log(infoText+"WARNUNG: player "+playerName+" not found!");
+	if(!player.online) return console.log(infoText+"WARNUNG: player "+playerName+" is not online!");
+	updatePlayer({
+		last_connection: now,
+		name: playerName,
+		online_since: 0,
+		online: false,
+		total_playedTime: player.total_playedTime+Math.round((now-player.online_since)/1000/60),
+	});
+	updateServerStatus("playerLeft",playerName);
+	console.log(infoText+playerName+" Verlässt das Spiel ("+serverStatus.players.length+" Spieler Online)");
+	BEEP();
+	setTimeout(BEEP,2e2);
+}
+function logoutAllPlayers(){
+	for(const playerName of Object.keys(players)){
+		if(players[playerName].online){
+			disconnectPlayer(playerName);
+		}
+	}
 }
 function saveHistory(){
 	// TODO better formart.
 	writeFileSync("history.json",JSON.stringify(histories,null,"\t"));
 	console.log("Speiche 'history.json'");
 }
+function savePlayers(){
+	// TODO better formart.
+	writeFileSync("players.json",JSON.stringify(players,null,"\t"));
+	console.log("Speiche 'players.json'");
+}
 function SHUTDOWN(){
 	if(shutdown) return;
 	shutdown=true;
 
 	console.log(infoText+"Beende...");
+
 	saveHistory();
+	savePlayers();
 
 	if(sleepingServerProcess){
 		sleepingServerProcess.close();
@@ -734,6 +755,9 @@ let serverStatus=serverStatusTemplate;
 try{
 	histories=JSON.parse(readFileSync("history.json","utf-8"));
 }catch(e){console.log("WARN: cant open history.json",e.message)}
+try{
+	players=JSON.parse(readFileSync("players.json","utf-8"));
+}catch(e){console.log("WARN: cant open players.json",e.message)}
 
 const io=socketIo(server.socketPort,{
 	cors:{
