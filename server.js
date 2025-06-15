@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// requires node 18 or higher for the minecraft-protocol!
+// requires node 14 or higher for the minecraft-protocol!
 //#!/opt/node-v18.15.0-linux-x64/bin/node
 const {readFileSync,writeFile,writeFileSync}=require("fs");
 const http=require("http");
@@ -62,6 +62,19 @@ if(config.path){
 	process.chdir(path);
 	process.chdir(config.path);
 }
+
+const playerTemplate={
+	connection_counter: 0,
+	first_connection: 0,
+	last_connection: 0,
+	messages_written: 0,
+	name: "",
+	online_since: 0,
+	online: false,
+	total_playedTime: 0,
+	uuid: "",
+	//TODO online time statistics like today,yesterday,this week,last week, etc...
+};
 
 const sessionData={};
 const players={};
@@ -307,11 +320,10 @@ function minecraftJavaServerProcessOnSTDOUT(msg){
 				if(Object.keys(players).includes(playerName)){
 					// TODO => player[playerName].uuid=playerUUID
 				}else{
-					players[playerName]={
-						// TODO => ...playerTemplate,
+					updatePlayer({
+						...playerTemplate,
 						name: playerName,
-						online: true,
-					};
+					});
 				}
 			}
 			else if(	// LFF5644[/127.0.0.1:59071] logged in with entity id 60397 at ([world]x, y, z)
@@ -324,7 +336,16 @@ function minecraftJavaServerProcessOnSTDOUT(msg){
 					.findIndex(item=>item=="[")
 				);
 				if(Object.keys(players).includes(playerName)){
-					players[playerName].online=true;
+					//players[playerName].online=true;
+					const modifications={
+						name: playerName,
+						online_since: now,
+						online: true,
+						connection_counter: (getPlayer(playerName).connection_counter)+1,
+					};
+					if(getPlayer(playerName).first_connection===0) modifications.first_connection=now;
+					updatePlayer(modifications);
+
 					updateServerStatus("playerJoin",playerName);
 					console.log(infoText+playerName+" Betritt das Spiel ("+serverStatus.players.length+" Spieler Online)");
 					setTimeout(BEEP,1e3);	// let pc beep in 1s
@@ -343,7 +364,15 @@ function minecraftJavaServerProcessOnSTDOUT(msg){
 					.findIndex(item=>item===" ")
 				);
 				if(Object.keys(players).includes(playerName)){
-					players[playerName].online=false;
+					//players[playerName].online=false;
+					const player=getPlayer(playerName);
+					updatePlayer({
+						last_connection: now,
+						name: playerName,
+						online_since: 0,
+						online: false,
+						total_playedTime: player.total_playedTime+Math.round((now-player.online_since)/1000/60),
+					});
 					updateServerStatus("playerLeft",playerName);
 					console.log(infoText+playerName+" Verlässt das Spiel ("+serverStatus.players.length+" Spieler Online)");
 					BEEP();
@@ -437,6 +466,17 @@ function messagePush(playerName,playerMsg,source="minecraft"){
 	const msg=[Date.now(),"message",playerName,playerMsg,source];
 	io.emit("history",msg);
 	histories.push(msg);
+
+	if(
+		source==="minecraft"&&
+		playerName!=="Server"&&
+		Object.keys(players).includes(playerName)
+	){
+		updatePlayer({
+			messages_written: getPlayer(playerName).messages_written+1,
+			name: playerName,
+		});
+	}
 }
 function logPush(log){
 	const msg=[Date.now(),"log",log];
@@ -562,6 +602,7 @@ function onSocketConnection(socket){
 	})
 	socket.on("disconnect",()=>{
 		// remove client form clients list
+		console.log("disconnecting socket "+socket.id);
 		socketClients=socketClients.filter(item=>item.id!==socket.id);
 	});
 	socket.on("histories",()=>{
@@ -612,6 +653,16 @@ function updateServerStatus(type,data={}){
 			sessionData.timeout_sleep=setTimeout(setSleeping,time,true);
 		}
 	}
+}
+function getPlayer(name){
+	return players[name];
+}
+function updatePlayer(playerModifications){
+	players[playerModifications.name]=Object.assign(
+		players[playerModifications.name]||{...playerTemplate},
+		playerModifications
+	);
+	console.log(getPlayer(playerModifications.name));
 }
 function saveHistory(){
 	// TODO better formart.
