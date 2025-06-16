@@ -319,7 +319,7 @@ function minecraftJavaServerProcessOnSTDOUT(msg){
 							item==" "
 						)
 				);
-				if(Object.keys(players).includes(playerName)){
+				if(getPlayer(playerName)){
 					// TODO => player[playerName].uuid=playerUUID
 				}else{
 					updatePlayer({
@@ -337,20 +337,8 @@ function minecraftJavaServerProcessOnSTDOUT(msg){
 					.split("")
 					.findIndex(item=>item=="[")
 				);
-				if(Object.keys(players).includes(playerName)){
-					//players[playerName].online=true;
-					const modifications={
-						name: playerName,
-						online_since: now,
-						online: true,
-						connection_counter: (getPlayer(playerName).connection_counter)+1,
-					};
-					if(getPlayer(playerName).first_connection===0) modifications.first_connection=now;
-					updatePlayer(modifications);
-
-					updateServerStatus("playerJoin",playerName);
-					console.log(infoText+playerName+" Betritt das Spiel ("+serverStatus.players.length+" Spieler Online)");
-					setTimeout(BEEP,1e3);	// let pc beep in 1s
+				if(getPlayer(playerName)){
+					connectPlayer(playerName);
 				}else{
 					console.log(infoText+"WARNUNG: player "+playerName+" not found!");
 					kickPlayer(playerName,"Too Early! Try again!");
@@ -365,7 +353,7 @@ function minecraftJavaServerProcessOnSTDOUT(msg){
 					.split("")
 					.findIndex(item=>item===" ")
 				);
-				if(Object.keys(players).includes(playerName)){
+				if(getPlayer(playerName)){
 					disconnectPlayer(playerName)
 				}else{
 					console.log(infoText+"WARNUNG: player "+playerName+" not found!");
@@ -381,7 +369,7 @@ function minecraftJavaServerProcessOnSTDOUT(msg){
 				const playerNameStart=msg.split("").findIndex(item=>item==="<")+1;
 				const playerNameEnd=msg.split("").findIndex(item=>item===">");
 				const playerName=msg.substring(playerNameStart,playerNameEnd);
-				if(Object.keys(players).includes(playerName)){
+				if(getPlayer(playerName)){
 					const playerMsg=msg.substring(playerNameEnd+2);
 					if(playerMsg.startsWith("$")){
 						let command=playerMsg.substring(1);
@@ -460,7 +448,7 @@ function messagePush(playerName,playerMsg,source="minecraft"){
 	if(
 		source==="minecraft"&&
 		playerName!=="Server"&&
-		Object.keys(players).includes(playerName)
+		getPlayer(playerName)
 	){
 		updatePlayer({
 			messages_written: getPlayer(playerName).messages_written+1,
@@ -615,44 +603,55 @@ function updateServerStatus(type,data={}){
 	}
 	else if(type=="playerJoin"){
 		serverStatus.players=serverStatus.players.filter(item=>item!==data);
-		const playersOnline=serverStatus.players.length;
 		serverStatus={
 			...serverStatusTemplate,
 			...serverStatus,
-			players:[
-				...serverStatus.players,
-				data,
-			],
+			players: players.filter(item=>item.online).map(item=>item.name),
 		};
 		io.emit("playerJoin",data);
-		if(server.sleep) clearTimeout(sessionData.timeout_sleep); // reset server sleeping counter
 	}
 	else if(type=="playerLeft"){
 		serverStatus={
 			...serverStatusTemplate,
 			...serverStatus,
-			players: serverStatus.players
-				.filter(item=>item!==data),
+			players: players.filter(item=>item.online).map(item=>item.name),
 		};
 		io.emit("playerLeft",data);
-
-		const playersOnline=serverStatus.players.length;
-		if(server.sleep&&playersOnline===0){
-			console.log(infoText+"Server goes sleeping in "+server.sleep_time+" minute"+(server.sleep_time>1?"s":""));
-			const time=server.sleep_time*1e3*60;
-			sessionData.timeout_sleep=setTimeout(setSleeping,time,true);
-		}
 	}
 }
 function getPlayer(name){
-	return players[name];
+	return players.find(item=>item.name===name);
 }
 function updatePlayer(playerModifications){
-	players[playerModifications.name]=Object.assign(
-		players[playerModifications.name]||{...playerTemplate},
-		playerModifications
-	);
-	//console.log(getPlayer(playerModifications.name));
+	let player=getPlayer(playerModifications.name);
+	if(!player){
+		players.push({
+			...playerTemplate,
+			...playerModifications,
+		});
+	}
+	else{
+		Object.assign(
+			player,
+			playerModifications,
+		);
+	}
+}
+function connectPlayer(playerName){
+	const now=Date.now();
+	const modifications={
+		name: playerName,
+		online_since: now,
+		online: true,
+		connection_counter: (getPlayer(playerName).connection_counter)+1,
+	};
+	if(getPlayer(playerName).first_connection===0) modifications.first_connection=now;
+	updatePlayer(modifications);
+
+	updateServerStatus("playerJoin",playerName);
+	console.log(infoText+playerName+" Betritt das Spiel ("+serverStatus.players.length+" Spieler Online)");
+	setTimeout(BEEP,1e3); // let pc beep in 1s
+	if(server.sleep) clearTimeout(sessionData.timeout_sleep); // reset server sleeping counter
 }
 function disconnectPlayer(playerName){
 	const now=Date.now();
@@ -670,11 +669,18 @@ function disconnectPlayer(playerName){
 	console.log(infoText+playerName+" Verlässt das Spiel ("+serverStatus.players.length+" Spieler Online)");
 	BEEP();
 	setTimeout(BEEP,2e2);
+
+	const playersOnline=players.filter(player=>player.online).length;
+	if(server.sleep&&playersOnline===0){
+		console.log(infoText+"Server goes sleeping in "+server.sleep_time+" minute"+(server.sleep_time>1?"s":""));
+		const time=server.sleep_time*1e3*60;
+		sessionData.timeout_sleep=setTimeout(setSleeping,time,true);
+	}
 }
 function logoutAllPlayers(){
-	for(const playerName of Object.keys(players)){
-		if(players[playerName].online){
-			disconnectPlayer(playerName);
+	for(const player of players){
+		if(player.online){
+			disconnectPlayer(player.name);
 		}
 	}
 }
