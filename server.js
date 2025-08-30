@@ -77,7 +77,7 @@ const playerTemplate={
 };
 
 const sessionData={};
-let players={};
+let players=[];
 let histories=[];
 let shutdownAction=null;
 let socketClients=[];
@@ -319,12 +319,14 @@ function minecraftJavaServerProcessOnSTDOUT(msg){
 							item==" "
 						)
 				);
-				if(getPlayer(playerName)){
+				if(existPlayer(playerName)){
 					// TODO => player[playerName].uuid=playerUUID
 				}else{
+					const now=Date.now();
 					updatePlayer({
 						...playerTemplate,
 						name: playerName,
+						first_connection: now,
 					});
 				}
 			}
@@ -375,7 +377,11 @@ function minecraftJavaServerProcessOnSTDOUT(msg){
 						let command=playerMsg.substring(1);
 						//talkToPlayer(playerName,"You enterd a command: "+command);
 
-						if(command==="save") minecraftJavaServerProcess.stdin.write("save-all\nsay "+playerName+" Saved the Game!\n");
+						if(command==="save"){
+							minecraftJavaServerProcess.stdin.write("say Speichere Minecraft-Welt & Server Statistik...\nsave-all\nsay "+playerName+" Saved the Game!\n");
+							saveHistory();
+							savePlayers();
+						}
 						else if(command.startsWith("write ")){
 							const text=command.substring(6);
 							minecraftJavaServerProcess.stdin.write(`tellraw @a ["",{"text":"${playerName}","bold":true,"color":"gold","clickEvent":{"action":"open_url","value":"https://lff.one/minecraftServerInfo"},"hoverEvent":{"action":"show_text","contents":["is writing over ",{"text":"LFF.one","bold":true,"color":"dark_green"}]}},": ${text}"]\n`)
@@ -388,6 +394,18 @@ function minecraftJavaServerProcessOnSTDOUT(msg){
 						else if(command==="scoreboard add health") minecraftJavaServerProcess.stdin.write("say create player 'health' scoreboard\nsay use '$scoreboard display list health' u can use list/sidebar/below_name to show or toggle\nscoreboard objectives add health health \"Leben\"\n");
 						else if(command.startsWith("scoreboard display ")) minecraftJavaServerProcess.stdin.write("scoreboard objectives setdisplay "+command.substring(19)+"\nsay showing '"+command.substring(19).split(" ")[1]+"' at '"+command.substring(19).split(" ")[0]+"'\n");
 						//if(command==="scoreboard display ") console.log("scoreboard objectives setdisplay "+command.substring(19)+"\nsay showing '"+command.substring(19).split(" ")[0]+"' at '"+command.substring(19).split(" ")[1]+"'\n");
+						else if(command==="info"){
+							minecraftJavaServerProcess.stdin.write([
+								"Server-Name: "+server.name,
+								"Maximaler Arbeitspeicher: "+server.ram,
+								"Sleeping-Server Version: "+server.version,
+								"Server-ID: "+server.id,
+								server.sleep?"Server Schläft nach "+server.sleep_time+" Minuten.":"Server Schlafmodus aus!",
+								"Server-Type: "+server.type,
+								"Herunterfahren-Aktion: "+server.shutdownAction,
+								"Absturz-Aktion: "+server.crashAction?server.crashAction:server.shutdownAction,
+							].map(item=>"say "+item+"\n").join(""));
+						}
 
 					}else{
 						messagePush(playerName,playerMsg);
@@ -619,6 +637,9 @@ function updateServerStatus(type,data={}){
 		io.emit("playerLeft",data);
 	}
 }
+function existPlayer(name){
+	return players.some(item=>item.name===name);
+}
 function getPlayer(name){
 	return players.find(item=>item.name===name);
 }
@@ -639,13 +660,20 @@ function updatePlayer(playerModifications){
 }
 function connectPlayer(playerName){
 	const now=Date.now();
-	const modifications={
+	const exist=existPlayer(playerName);
+	const modifications=exist?{
 		name: playerName,
 		online_since: now,
 		online: true,
 		connection_counter: (getPlayer(playerName).connection_counter)+1,
+	}:{
+		name: playerName,
+		online_since: now,
+		online: true,
+		connection_counter: 1,
+		first_connection: now,
 	};
-	if(getPlayer(playerName).first_connection===0) modifications.first_connection=now;
+	//if(!exist||getPlayer(playerName).first_connection===0) modifications.first_connection=now;
 	updatePlayer(modifications);
 
 	updateServerStatus("playerJoin",playerName);
@@ -676,6 +704,9 @@ function disconnectPlayer(playerName){
 		const time=server.sleep_time*1e3*60;
 		sessionData.timeout_sleep=setTimeout(setSleeping,time,true);
 	}
+
+	saveHistory();
+	savePlayers();
 }
 function logoutAllPlayers(){
 	for(const player of players){
@@ -686,7 +717,7 @@ function logoutAllPlayers(){
 }
 function saveHistory(){
 	// TODO better formart.
-	writeFileSync("history.json",JSON.stringify(histories,null,"\t"));
+	writeFileSync("history.json",JSON.stringify(histories.filter(item=>item[1]!=="log"),null,"\t"));
 	console.log("Speiche 'history.json'");
 }
 function savePlayers(){
@@ -699,7 +730,8 @@ function SHUTDOWN(){
 	shutdown=true;
 
 	console.log(infoText+"Beende...");
-
+	
+	logoutAllPlayers();
 	saveHistory();
 	savePlayers();
 
