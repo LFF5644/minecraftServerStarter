@@ -214,6 +214,51 @@ function minecraftJavaServerProcessOnExit(code){
 		shutdownAction=null;
 	}
 }
+function tellraw(sender,message,receiver="@a"){
+	if(
+		minecraftJavaServerProcess&&
+		!minecraftJavaServerProcess.closed
+	){
+		const versions=[
+			["1.15","1.16","1.17","1.18","1.19"],
+			["1.20","1.20.1","1.20.2","1.20.3","1.20.4","1.20.5","1.20.6","1.21","1.21.1","1.21.2","1.21.3","1.21.4"],
+			["1.21.5","1.21.6","1.21.7","1.21.8"],
+		];
+		const commands=[
+			`tellraw @RECEIVER ["",{"text":"{USR}","bold":true,"color":"gold","clickEvent":{"action":"open_url","value":"https://lff.one/minecraftServerInfo"},"hoverEvent":{"action":"show_text","value":[{"text":"is writing over"},{"text":"LFF.one","bold":true,"color":"dark_green"}]}},{"text":": "},{"text":{MSG}}]`, // 1.15
+			`tellraw @RECEIVER ["",{"text":"{USR}","bold":true,"color":"gold","clickEvent":{"action":"open_url","value":"https://lff.one/minecraftServerInfo"},"hoverEvent":{"action":"show_text","contents":[{"text":"is writing over"},{"text":"LFF.one","bold":true,"color":"dark_green"}]}},{"text":": "},{"text":{MSG}}]`, // 1.20.0 - 1.20.4 & 1.20.5 - 1.20.6 & 1.21.0 - 1.21.4 
+			`tellraw @RECEIVER ["",{text:"{USR}",bold:true,color:"gold",click_event:{action:"open_url",url:"https://lff.one/minecraftServerInfo"},hover_event:{action:"show_text",value:[{text:"is writing over"},{text:"LFF.one",bold:true,color:"dark_green"}]}},{text:": "},{text:{MSG}}]`, // 1.21.5 - 1.21.8 (current)
+		];
+		//const FALLBACK_COMMAND=`say {USR}: {MSG}`; // fallback
+		const FALLBACK_COMMAND=commands[2]; // use newest tellraw command as fallback xD
+
+		// find right version
+		let command;
+		for(let index=0;index<versions.length;index+=1){
+			const currentVersions=versions[index];
+			if(currentVersions.includes(server.version)){ // maybe some or for needed TODO xD
+				command=commands[index];
+				break;
+			}
+		}
+		if(!command){
+			console.log(infoText+"WARNUNG: cant find right tellraw command for server version "+server.version+" use fallback command!");
+			command=FALLBACK_COMMAND;
+		}
+
+		command=FALLBACK_COMMAND; // TODO remove this line xD
+		command=(command
+			.split("@RECEIVER").join(receiver)
+			.split("{USR}").join(sender)
+			.split("{MSG}").join(JSON.stringify(message))
+		);
+		console.log(infoText+"Executing command: "+command);
+
+		minecraftJavaServerProcess.stdin.write(command+"\n");
+		messagePush(sender,message,"web");
+	}
+
+}
 function minecraftJavaServerProcessOnSTDOUT(msg){
 	//const text=buffer.toString("utf-8");	// buffer => text
 	const now=Date.now();
@@ -374,8 +419,9 @@ function minecraftJavaServerProcessOnSTDOUT(msg){
 				if(getPlayer(playerName)){
 					const playerMsg=msg.substring(playerNameEnd+2);
 					if(playerMsg.startsWith("$")){
+						messagePush(playerName,playerMsg);
 						let command=playerMsg.substring(1);
-						//talkToPlayer(playerName,"You enterd a command: "+command);
+						//talkToPlayer(playerName,"You entered a command: "+command);
 
 						if(command==="save"){
 							minecraftJavaServerProcess.stdin.write("say Speichere Minecraft-Welt & Server Statistik...\nsave-all\nsay "+playerName+" Saved the Game!\n");
@@ -397,7 +443,7 @@ function minecraftJavaServerProcessOnSTDOUT(msg){
 						else if(command==="info"){
 							minecraftJavaServerProcess.stdin.write([
 								"Server-Name: "+server.name,
-								"Maximaler Arbeitspeicher: "+server.ram,
+								"Maximaler Arbeitsspeicher: "+server.ram,
 								"Sleeping-Server Version: "+server.version,
 								"Server-ID: "+server.id,
 								server.sleep?"Server Schläft nach "+server.sleep_time+" Minuten.":"Server Schlafmodus aus!",
@@ -406,7 +452,9 @@ function minecraftJavaServerProcessOnSTDOUT(msg){
 								"Absturz-Aktion: "+server.crashAction?server.crashAction:server.shutdownAction,
 							].map(item=>"say "+item+"\n").join(""));
 						}
-
+						else{
+							talkToPlayer(playerName,"Unknown Command: "+command);
+						}
 					}else{
 						messagePush(playerName,playerMsg);
 					}
@@ -457,11 +505,22 @@ function minecraftJavaServerProcessOnSTDOUT(msg){
 	}
 	else throw new Error("Minecraft-Server Type not supported!");
 }
+function optimiseHistory(){
+	console.log(infoText+"Optimise History ...");
+	for(let index=0;index<histories.length;index+=1){
+		const entry=histories[index];
+		const id=entry[0];
+		while(histories.some((item,itemIndex)=>itemIndex!==index&&item[0]===histories[index][0])){
+			console.log(index,histories[index]);
+			histories[index][0]+=1;
+		}
+	}
+	console.log(infoText+"Optimise History ... Done");
+
+}
 function messagePush(playerName,playerMsg,source="minecraft"){
 	console.log(infoText+playerName+": "+playerMsg);
-	const msg=[Date.now(),"message",playerName,playerMsg,source];
-	io.emit("history",msg);
-	histories.push(msg);
+	historyPush("message",playerName,playerMsg,source);
 
 	if(
 		source==="minecraft"&&
@@ -475,9 +534,16 @@ function messagePush(playerName,playerMsg,source="minecraft"){
 	}
 }
 function logPush(log){
-	const msg=[Date.now(),"log",log];
-	io.emit("history",msg);
-	histories.push(msg);
+	historyPush("log",log);
+}
+function historyPush(...entry){
+	let id=Date.now();
+	while(histories.some(item=>item[0]===id)) id+=1;
+
+	const result=[id,...entry];
+	io.emit("history",result);
+	histories.push(result);
+	return result;
 }
 function createSleepingServerProcess(){
 	sleepingServerProcess=mcp.createServer({
@@ -592,8 +658,9 @@ function onSocketConnection(socket){
 		minecraftJavaServerProcess.stdin.write(cmd+"\n");
 	});
 	socket.on("writeMessage",(nickname,message,source="web",cb=()=>{})=>{
-		minecraftJavaServerProcess.stdin.write(`tellraw @a ["",{"text":"${nickname}","bold":true,"color":"gold","clickEvent":{"action":"open_url","value":"https://lff.one/minecraftServerInfo"},"hoverEvent":{"action":"show_text","contents":["is writing over ",{"text":"LFF.one","bold":true,"color":"dark_green"}]}},": ${message}"]\n`);
-		messagePush(nickname,message,source);
+		//minecraftJavaServerProcess.stdin.write(`tellraw @a ["",{"text":"${nickname}","bold":true,"color":"gold","clickEvent":{"action":"open_url","value":"https://lff.one/minecraftServerInfo"},"hoverEvent":{"action":"show_text","contents":["is writing over ",{"text":"LFF.one","bold":true,"color":"dark_green"}]}},": ${message}"]\n`);
+		//messagePush(nickname,message,source);
+		tellraw(nickname,message);
 		cb(true);
 	})
 	socket.on("disconnect",()=>{
@@ -796,6 +863,8 @@ try{
 try{
 	players=JSON.parse(readFileSync("players.json","utf-8"));
 }catch(e){console.log("WARN: cant open players.json",e.message)}
+
+optimiseHistory();
 
 const io=socketIo(server.socketPort,{
 	cors:{
